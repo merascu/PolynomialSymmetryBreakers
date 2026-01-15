@@ -1,0 +1,1614 @@
+#+TITLE: Generating Quadratic Symmetry Breakers for Bin Packing
+#+AUTHOR: Johannes Middeke and Mǎdǎlina Eraşcu
+#+DATE: January 2026
+
+
+* Overview and Compilation
+
+The program is written in a {{{LiterateProgramming}}} style using
+{{{Emacs}}} and {{{Org}}}. That means, that the program code is
+embedded into the documentation (instead of doing it the other way
+around). In order to extract the code use
+
+#+BEGIN_SRC shell :tangle no :exports both :noweb no :results value :wrap example
+emacs --batch -l org quadratic-breaker.org -f org-babel-tangle
+#+END_SRC
+
+or open the file in {{{Emacs}}} and use the function ~org-babel-tangle~
+(as ~M-x org-babel-tangle~ or ~C-c C-v C-t~). The code will be extracted
+into the current directory (or the same directory where the {{{Org}}}
+file resides).
+
+
+The program uses the programming language {{{OCaml}}}. We require the
+external {{{RE}}} library which can be install using {{{Opam}}} with
+the command
+
+#+BEGIN_SRC shell :tangle no :eval never
+opam install re
+#+END_SRC
+
+
+In order to compile the code (after it has been extracted), use
+command
+
+#+BEGIN_SRC shell :tangle no :eval never
+ocamlbuild -package re breakers.native
+#+END_SRC
+
+
+The generated binary ~breaker.native~ expects an ~.LP~ file as
+argument. It will read the list with the sizes of the objects from the
+comment on the second line.
+
+
+
+* Some Helper Functions
+
+Here we collect some auxiliary functions which are too general to fit
+into any of the other sections.
+
+The first example is a cartesian mapping function which takes a
+function \(f\), a list \(x = [x_1; \ldots; x_m]\), and another list
+\(y = [y_1; \ldots; y_n]\). It returns a list of the results of
+applying \(f\) to every possible pair of entries of \(x\) and
+\(y\). That is, we obtain a list such as \([f(x_1,y_1); \ldots;
+f(x_1,y_n); \ldots;f(x_m,y_n)]\). Note that the exact order of the
+results is not specified and might change in future versions.
+
+The second function is a pairwise map which takes a function \(f\) and
+a list \(x = [x_1; \ldots; x_m]\) and which applies \(f\) to pairs of
+consecutive entries of \(x\). That is, the function returns
+\([f(x_1,x_2); f(x_2, x_3); \ldots; f(x_{m-1}, x_m)]\). We use
+sequences for the implementation since ~Seq.map2~ does not complain
+about arguments of different length while ~List.map2~ would raise an
+exception.
+
+The third function computes a list of size boundaries from a sorted
+list of sizes. This is important for generating the row permutations.
+
+Finally, there is a function which generates (and sets) a new random
+seed. We return the generated seed for printing. (Notice that we
+generate seeds between \(1\,000\) and \(9\,999\) simply because it
+looks nicer when we print them.)
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module Aux = struct
+  let cartesian f xs ys =
+    List.concat_map (fun x -> List.map (fun y -> f x y) ys) xs
+
+  let pairwise f xs = 
+    let xs = List.to_seq xs in
+    Seq.map2 f xs (Seq.drop 1 xs) |> List.of_seq
+
+  
+  let size_boundaries sizes =
+    let rec loop j = function
+      | [] -> []
+      | [_] -> [j]
+      | a :: b :: rest ->
+         let boundaries = loop (j + 1) (b :: rest)  in
+         if a = b then boundaries else j :: boundaries
+    in
+    0 :: loop 1 sizes
+
+  let seed () =
+    Random.self_init ();
+    let s = 1_000 + Random.int 9_000 in
+    Random.init s;
+    s
+end
+#+END_SRC
+
+
+
+* Variables
+
+Let us start with the definition of variables. There are the
+\(x_{i,k}\) as well as the \(y_k\) where we use \(i\) for the row
+indices and \(k\) for the column indices. We add a pretty printer for
+variables; and we define an order which has \(x_{i,k} < y_\ell\) for
+all \(i,k,\ell\), \(y_k < y_\ell\) iff \(k < \ell\), and \(x_{i,k} <
+x_{j,\ell}\) if \((i,k)\) is less than \((j,\ell)\) in the
+lexicographic order.
+
+We decided to put stuff into modules even though we are just tangling
+everything into a single file. This way, we already have some
+structure just in case this becomes a larger project. It is also
+shorter to be able to write ~Var.compare~ instead of ~compare_variable~ or
+something. (Also, the example shows that I can reuse the same names
+for functions rather than having to differentiate them.)
+
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module Var = struct
+  type t = X of int * int | Y of int
+
+  let x i k = X (i, k) and y k = Y k
+
+  let ys n = Array.init n y
+
+  let xs m n = List.init m (fun i -> Array.init n (x i)) |> Array.concat
+
+  
+  let show ff = function
+    | X (i, k) -> Format.fprintf ff "x_%d_%d" i k
+    | Y k -> Format.fprintf ff "y_%d" k
+
+  let compare v w =
+    match v, w with
+      | Y _, X _ ->  1
+      | X _, Y _ -> -1
+      | X (i, k), X (s, t) -> begin (* lexicographic order *)
+          match Int.compare i s with
+            | 0 -> Int.compare k t
+            | c -> c
+        end
+      | Y k, Y l -> Int.compare k l
+end
+#+END_SRC
+
+
+
+* Random Samples
+
+For the full version of the program, we want to generate random
+polynomials (of a certain shape) and random permutations. For both
+tasks, we will need to draw random samples from an array of values. In
+the case of polynomials, we will use sampling without replacement
+while for the permutations we will use sampling with replacement. (We
+could also use sampling with replacement for the polynomials---but for
+now we stick with the method that was used in the {{{Python}}} code.)
+
+There are no functions in {{{OCaml}}}'s standard library for sampling
+from a list or an array. Hence, we need to write our own. For sampling
+with replacement this is easy. For sampling without replacement, we
+will shuffle the array using a version of the [[https://en.wikipedia.org/wiki/Fisher–Yates_shuffle][Fisher--Yates shuffle]]
+before we take a prefix of the array.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module Sample = struct
+  let with_replacement a k =
+    let n = Array.length a in
+    List.init k (fun _ -> a.(Random.int n))
+
+  let fisher_yates_inplace arr =
+    let n = Array.length arr in
+    for i = n - 1 downto 1 do
+      let j = Random.int (i + 1) in
+      let tmp = arr.(i) in
+      arr.(i) <- arr.(j);
+      arr.(j) <- tmp
+    done;
+    arr
+  
+  let without_replacement a k =    
+    let n = Array.length a in
+    if n < k then failwith "Not enough elements in array for sampling.";
+    ignore (fisher_yates_inplace a);
+    Array.sub a 0 k |> Array.to_list
+end
+#+END_SRC
+
+
+
+* Permutations
+
+We will think of our variables as nestled in their matrix
+\begin{equation*}
+  V = \begin{pmatrix}
+    y_1     & \cdots & y_n     \\
+    x_{1,1} & \cdots & x_{1,n} \\
+    \vdots  &        & \vdots  \\
+    x_{m,1} & \cdots & x_{m,n} \\
+  \end{pmatrix}
+\end{equation*}
+and described the permutations in terms of \(V\) rather than in terms
+of \(\vec(V)\). That is, we consider row permutations which permutate
+the first index of the \(x_{i,k}\) and column permutations which
+permutate the second index of the \(x_{i,k}\) as well as the single
+index of the \(y_k\).
+
+There are two kinds of permutations: The column permutations \(M_\tau
+\otimes \ID[m+1]\) where \(\tau \in S_n\) is arbitrary and the row
+permutations \(\ID[n] \otimes \diag(1, M_\sigma)\) where \(\sigma \in
+S_m\) does not cross size boundaries (see below). Recall that instead
+of using arbitrary permutations, we only work with transpositions.
+
+A bin-packing problem comes with a list of sizes \(s_0, \ldots,
+s_{m-1}\). In order to keep the code simpler, we will always assume
+that \(s_0 \leq \ldots \leq s_{m-1}\). Size boundaries are indices \(0
+= i_1 < \ldots < i_{\ell + 1} = m\) such that \(s_{i_j} = \ldots =
+s_{i_{j+1} - 1}\) for all \(j = 0, \ldots, \ell\) and \(s_{i_j - 1} <
+s_{i_j}\) for \(j=1, \ldots, \ell\). 
+
+
+We will define only transpositions (of rows or columns). We will get
+more permutations by applying a bunch of random transpositions in a
+row.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module Perm = struct
+  open Var
+  
+  type t = Row of int * int | Col of int * int
+
+  let row i j = Row (i, j) and col k l = Col (k, l)
+  
+  let show ff = function
+    | Row (i,j) -> Format.fprintf ff "R(%d %d)" i j
+    | Col (k,l) -> Format.fprintf ff "C(%d %d)" k l
+  
+  let apply p v =
+  match p, v with
+      | Row (i1, i2), X (i3, k) when i1 = i3 -> X (i2, k)
+      | Row (i1, i2), X (i3, k) when i2 = i3 -> X (i1, k)
+      | Col (k1, k2), X (i, k3) when k1 = k3 -> X (i, k2)
+      | Col (k1, k2), X (i, k3) when k2 = k3 -> X (i, k1)
+      | Col (k1, k2), Y k3 when k1 = k3 -> Y k2
+      | Col (k1, k2), Y k3 when k2 = k3 -> Y k1
+      | _, x_or_y -> x_or_y
+  
+  let row_perms boundaries =
+    Aux.pairwise (fun a b ->
+        Array.init (b - a - 1) (fun l -> row a (l + a + 1))) boundaries
+    |> Array.concat
+
+  let col_perms n = Array.init (n - 1) (fun j -> col 0 (j + 1))
+end
+#+END_SRC
+
+
+
+* Free Abelian Groups generated by Ordered Sets
+
+For polynomials, it makes sense to put a bit more thought into
+it. Assume that \(h\) is a polynomial and write it as a sum of its
+homogeneous components \(h = \sum_d h_d\) where \(h_d\) is a
+homogeneous polynomial of degree \(d\) for each \(d\). If we take a
+permutation \(g\) and use it to permutate the variables in \(h\), then
+each homogeneous component is mapped to a homogeneous polynomial of
+the same degree. Similarly, when we form the difference \(h\circ g -
+h\), then each homogeneous component is subtracted from a homogeneous
+component of the same degree.
+
+In other words, it makes sense to define our polynomials in terms of
+their decomposition in homogeneous components. We are only interested
+in polynomials of a (total) degree less or equal to \(2\). Hence, we
+only need a quadratic, a linear, and a constant homogeneous
+component. In fact, the constant component will just cancel out when
+we compute the difference \(h\circ g - h\). Thus, we only need to have
+a linear component and a quadratic component.
+
+Before we actually define the polynomials, however, we will define
+[[https://en.wikipedia.org/wiki/Free_abelian_group][free Abelian groups]] generated by an ordered set of generators. This is
+motivated by the fact that the addition is the same for linear and
+quadratic components. More precisely, the linear components are a free
+Abelian group with single variables as generators, while the quadratic
+components have products of two variables as their generators.
+
+
+Even before the free Abelian groups, though, we need to talk about
+ordered sets. There is already the ~Set.OrderedType~ interface. However,
+we will also want to pretty print our group elements (and later the
+polynomials). Thus, we define our own interface with a pretty printing
+function added to it.
+
+I was debating with myself whether I should ditch the standard library
+comparisons and their integer results in favour of a proper comparison
+type a la {{{Haskell}}}. However, since I also might want to put
+things into {{{OCaml}}} sets or maps at some point and since I
+definitely want to use ~List.sort~, I have decided to stick with the
+standard library method---as dissatisfying as it might be.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module type OrderedSet = sig
+  include Set.OrderedType
+  val show  : Format.formatter -> t -> unit
+end
+#+END_SRC
+
+
+
+
+
+Given an ordered set \(S\), the elements of the free Abelian group
+\(\ZZ S\) generated by \(S\) can be written as formal sums
+\begin{equation*}
+  \sum_{s \in S} z_s s
+\end{equation*}
+where \(z_s \in \ZZ\) for all \(s \in S\) and \(z_s = 0\) for almost
+all \(s\). (There does not seem to be a standard notation for this
+group. In addition to my \(\ZZ S\), there are also \(\ZZ^{(S)}\),
+\(G(S)\), or \(F(S)\).) 
+
+We will represent the formal sums in {{{OCaml}}} by lists of terms
+\(z_s s\) with \(s \in S\) and \(z_s \in \ZZ\). We will refer to
+\(z_s\) as the coefficient of the term and to \(s\) as a generator or
+a basis element. For \(x \in \ZZ S\) with \(x \neq 0\), the leading
+generator or the leading basis element of \(x\) is the largest \(s \in
+S\) which has a non-zero coefficient in \(x\). If \(s\) is the leading
+generator of \(x\), then its coefficient \(z_s\) is called the leading
+coefficient of \(x\) and their (formal) product \(z_s s\) is called
+the leading term of \(x\). The implementation will assume (and
+enforce) the following properties:
+
+1) The basis elements of all terms in the list are pairwise different.
+2) All coefficients are non-zero.
+3) The terms are sorted in descending order wrt the basis elements.
+
+
+These assumptions will hopefully help to make addition and subtraction
+more efficient since it allows those functions to go through their
+arguments in parallel---always keeping the larger term in front and
+adding the rest. If both terms involve the same generator, then we
+need to add or subtract the coefficients. If the result is zero, then
+we discard the term. Else, we attach it to the sum or difference. Note
+that the current implementation is not tail recursive. We do not
+expect the formal sums to be long enough to justify the overhead of
+carrying an accumulator around and reversing it in the end.
+
+We also introduce a comparison function so that we will be able to put
+our polynomials into {{{OCaml}}} sets later. We do a basic
+lexicographic comparison: Consider \(x = a_1 s_1 + \ldots + a_n s_n\)
+and \(y = b_1 s_1 + \ldots + b_n s_n\) where we assume \(s_1 > \ldots
+> s_n\). (In the formal sum world, assuming that \(x\) and \(y\)
+include the same generators does not lead to a loss of generality
+since we can always pad our sums with additional terms where the
+coefficients are zero.) Then \(x < y\) iff there is an index \(1 \leq
+k \leq n\) such that \(a_j = b_j\) for \(j = 1, \ldots, k - 1\) and
+\(a_k < b_k\). In the implementation, we do not have the same basis
+elements---instead \(y = b_1 t_1 + \ldots + b_p t_p\) where \(t_1 >
+\ldots > t_p\) are some basis elements. However, whenever an \(s_j\)
+does not occur in \(y\), we can simply assume that it has coefficient
+\(0\) in \(y\). Similarly, whenever a \(t_k\) does not occur in \(x\),
+then we can pretend that it has coefficient \(0\) in \(x\). Thus, we
+start from the left with the maximum of \(s_1\) and \(t_1\) and
+compare their coefficients (keeping in mind that non-existing
+coefficients are zero). If they are equal, we remove the term and
+compare the rest. (In the two special cases where either \(x\) or
+\(y\) have become zero, this means that we only need to check the sign
+of the leading coefficient of the other group element.)
+
+Pretty printing is always the most tedious thing about these
+implementations. We print non-zero group elements term by term.  For
+each term, if the coefficient is \(\pm 1\), then we do not print the
+coefficient but only the sign. The first term needs to be treated
+specially: If the coefficient is positive, then we do not put a plus
+in front of it. Note that if the leading coefficient is \(-1\), then
+we write it out in full since we know that that syntax works in
+{{{Gurobi}}} (while we do know where a single minus will also work).
+
+Next, we provide two mapping functions: One which maps over
+coefficients and one which maps over generators. Here, we need to be
+careful to make sure that the general assumptions about the data
+representation are not violated. More precisely, when we map over
+coefficients, we need to remove any coefficients which have become
+zero; and when we map over generators, we need to sort the list and
+combine terms with like generators afterwards. (For the coefficients,
+I have decided to use the built-in map and filter functions since that
+might be faster than an explicit loop.)
+
+Finally, we also provide functions to convert group elements into
+lists and back. The conversion function from lists to group elements
+needs to ensure the assumptions of our format, while the conversion
+functions from group elements to lists is trivial. In order to ensure
+that arbitrary lists conform to our assumptions, we can simply use the
+mapping function since the steps (sorting the terms by generators and
+combining terms with the same generator) are exactly the same.
+
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module Abelian (S : OrderedSet) : sig
+  type coefficient = int
+  type generator = S.t
+  type term = coefficient * generator
+  type t = private term list
+  val zero : t
+  val is_zero : t -> bool
+  val inject : generator -> t
+  val ( ! ) : generator -> t
+  val lg : t -> generator    (* leading generator *)
+  val lc : t -> coefficient  (* leading coefficient *)
+  val lt : t -> term         (* leading term *)
+  val add :  t -> t -> t
+  val negate : t -> t
+  val subtract : t -> t -> t
+  val ( + ) :  t -> t -> t
+  val ( ~- ) : t -> t
+  val ( - ) : t -> t -> t
+  val compare : t -> t -> int
+  val show  : Format.formatter -> t -> unit
+  val map_gen : (generator -> generator) -> t -> t
+  val map_coeff : (coefficient -> coefficient) -> t -> t
+  val to_list : t -> term list
+  val of_list : term list -> t
+end = struct
+  type coefficient = int
+  type generator = S.t
+  type term = coefficient * generator
+  type t = term list
+  
+  let zero = [] and is_zero t = t = []
+
+  let lt = function 
+    | t :: _ -> t
+    | [] -> failwith "Zero does not have a leading term."
+
+  let lc x = fst (lt x) and lg x = snd (lt x) 
+  
+  let inject s = [1, s]
+
+  let ( ! ) = inject
+  
+  let rec add x y =
+    match x, y with
+      | [], y -> y
+      | x, [] -> x        
+      | (a,s) :: xs, (b,t) :: ys ->
+         let q = S.compare s t in
+         if      q < 0 (* s < t *) then (b,t) :: add x ys
+         else if q > 0 (* s > t *) then (a,s) :: add xs y
+         else          (* s = t *)
+           let c = a + b and zs = add xs ys in
+           if c = 0 then zs else (c, s) :: zs
+
+  let negate xs = List.map (fun (a,s) -> (~- a,s)) xs
+  
+  let rec subtract x y =
+    match x, y with
+      | [], y -> negate y
+      | x, [] -> x        
+      | (a,s) :: xs, (b,t) :: ys ->
+         let q = S.compare s t in
+         if      q < 0 (* s < t *) then (~- b,t) :: subtract x ys
+         else if q > 0 (* s > t *) then (a,s) :: subtract xs y
+         else          (* s = t *)
+           let c = a - b and zs = subtract xs ys in
+           if c = 0 then zs else (c, s) :: zs
+
+
+  let rec compare x y =
+    match x, y with
+      | [], [] ->  0 (* x = y *)
+      | [], (b,_) :: _ -> Int.compare 0 b
+      | (a,_) :: _, [] -> Int.compare a 0
+      | (a,s) :: xs, (b,t) :: ys ->
+         let q = S.compare s t in
+         if      q < 0 (* s < t *) then Int.compare 0 b
+         else if q > 0 (* s > t *) then Int.compare a 0
+         else (* s = t *)
+           match Int.compare a b with
+             | 0 -> compare xs ys
+             | q -> q
+
+
+  let show_term ~first ff (a, s) =
+    if first
+    then
+      match a with
+        |  0 -> failwith "How can a coefficient be zero?"
+        |  1 -> S.show ff s
+        | -1 -> Format.fprintf ff "-1 %a" S.show s 
+        | a -> Format.fprintf ff "%d %a" a S.show s
+    else
+      match a with 
+        |  0 -> failwith "How can a coefficient be zero?"
+        |  1 -> Format.fprintf ff " + %a" S.show s
+        | -1 -> Format.fprintf ff " - %a" S.show s 
+        | a when a > 0 -> Format.fprintf ff " + %d %a" a S.show s
+        | a (* < 0 *)  -> Format.fprintf ff " - %d %a" (abs a) S.show s
+
+
+  
+  let show ff = function
+    | [] -> Format.fprintf ff "0"
+    | (a, s) :: xs ->
+       show_term ~first:true ff (a,s);
+       List.iter (show_term ~first:false ff) xs
+
+
+  let map_coeff f x =
+    List.map (fun (a, s) -> (f a, s)) x
+    |> List.filter (fun (a, _) -> a <> 0)
+
+  let map_gen f x =
+    let rec combine = function
+      | (a, s) :: (b, t) :: xs ->
+         if S.compare s t = 0
+         then
+           let c = a + b in
+           if c = 0 then combine xs else combine ((c, s) :: xs)
+         else (a, s) :: (combine ((b, t) :: xs))
+      | other -> other
+    in
+    List.map (fun (a, s) -> (a, f s)) x
+    |> List.sort (fun (_, s) (_, t) -> S.compare t s) (* descending! *)
+    |> combine
+
+  let to_list t = t
+
+  let of_list ts = map_gen Fun.id ts
+  
+  let ( + ) = add and ( - ) = subtract and ( ~- ) = negate
+end
+#+END_SRC
+
+
+
+* Polynomials
+
+We can now easily define linear polynomials as a free Abelian group
+generated by variables. 
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module LinearMonomial = struct
+  include Var
+end
+
+module Linear = Abelian(LinearMonomial)
+#+END_SRC
+
+
+
+We represent quadratic monomials (ie, products of exactly two
+variables) by pairs where the first entry is always less or equal to
+the second. (This convention ensures that we do not need to worry
+about the commutativity of products.) We compare monomials
+lexicographically. For the pretty printing, we tread the case that
+both factors are the same specially.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module QuadraticMonomial = struct
+  type t = Var.t * Var.t
+
+  let make u v =
+    if Var.compare u v < 0 (* u < v *) then (u, v) else (v, u)
+
+  let ( * ) = make
+  
+  let compare (u, v) (w, z) =
+    match Var.compare u w with (* lexicographic order *)
+      | 0 -> Var.compare v z
+      | q -> q
+
+  let apply p (u, v) = make (Perm.apply p u) (Perm.apply p v)
+
+  let show ff (u, v) =
+    if Var.compare u v = 0
+    then Format.fprintf ff "%a ^ 2" Var.show u
+    else Format.fprintf ff "%a * %a" Var.show u Var.show v
+
+end
+
+module Quadratic = Abelian(QuadraticMonomial)
+#+END_SRC
+
+
+
+Now, a polynomial is simply a combination of a linear expression and a
+quadratic expression. (Recall that we do no need constants and that we
+do not consider higher degrees since {{{Gurobi}}} cannot handle
+those.)
+
+#+BEGIN_CORRECTION
+It turns out that {{{Gurobi}}} can handle more general terms including
+cubic (or higher degree) polynomials. However, the syntax is very
+ugly.
+#+END_CORRECTION
+
+
+We define a couple of classification functions for our polynomials. We
+say that a polynomial \(h\) is
+
++ linear :: if \(deg h = 1\),
++ quadratic :: if \(deg h = 2\)
++ purely quadratic :: if \(h\) is quadratic and \(h\) has no linear
+  terms.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module Polynomial = struct
+  type t = {linear : Linear.t; quadratic : Quadratic.t}
+
+  let zero = {linear = Linear.zero; quadratic = Quadratic.zero}
+  and is_zero {linear; quadratic} =
+    Linear.is_zero linear && Quadratic.is_zero quadratic
+  and is_linear {linear; quadratic} =
+    not (Linear.is_zero linear) && Quadratic.is_zero quadratic
+  and is_quadratic {linear; quadratic} =
+    not (Quadratic.is_zero quadratic)
+  and is_purely_quadratic {linear; quadratic} =
+    Linear.is_zero linear && not (Quadratic.is_zero quadratic)
+
+  let apply_single p {linear; quadratic} =
+    {linear = Linear.map_gen (Perm.apply p) linear;
+     quadratic = Quadratic.map_gen (QuadraticMonomial.apply p) quadratic}
+
+  let apply perms h =
+    List.fold_left (fun a b -> apply_single b a) h perms
+
+  
+  let add {linear = la; quadratic = qa} {linear = lb; quadratic = qb} =
+    {linear = Linear.add la lb; quadratic = Quadratic.add qa qb}
+
+  let subtract {linear = la; quadratic = qa} {linear = lb; quadratic = qb} =
+    {linear = Linear.subtract la lb; quadratic = Quadratic.subtract qa qb}
+
+  let ( + ) = add and ( - ) = subtract
+
+
+  let compare {linear = la; quadratic = qa} {linear = lb; quadratic = qb} =
+    match Linear.compare la lb with
+      | 0 -> Quadratic.compare qa qb
+      | r -> r
+
+  let show ff {linear; quadratic} =
+    if Linear.is_zero linear 
+    then
+      if Quadratic.is_zero quadratic
+      then Format.fprintf ff "0"
+      else Format.fprintf ff "[ %a ]" Quadratic.show quadratic
+    else
+      if Quadratic.is_zero quadratic
+      then Linear.show ff linear
+      else Format.fprintf ff "%a + [ %a ]"
+             Linear.show linear
+             Quadratic.show quadratic     
+end
+#+END_SRC
+
+
+
+* Random Polynomials 
+
+
+*************** TODO Put random polynomials into the Polynomial module
+The generation of random polynomials should be part of the polynomials
+module.
+*************** END
+
+
+In the {{{Python}}} version of the program, we generate random
+quadratic terms as products of two linear terms.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let multiply_linear xs ys =
+  let xs = Linear.to_list xs and ys = Linear.to_list ys in
+  let times (a,s) (b,t) = (a * b, QuadraticMonomial.make s t) in
+  Aux.cartesian times xs ys |> Quadratic.of_list
+#+END_SRC
+
+
+A random linear polynomial is generated by taking a sample of \(p\)
+variables (without replacement) and adding them together. A random
+quadratic polynomial is generated as a product of two linear
+polynomials of lengths \(p\) and \(q\). (That is, it will contain up
+to \(p q\) terms.) The main function of this section allows to
+generated a random polynomial with both quadratic terms and linear
+terms. (The sets of variables as well as the number of terms for both,
+the linear and the quadratic component, can be specified separately.)
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let random_linear ~vars ~len =
+  let vs = Sample.without_replacement vars len in
+  let linear = List.map (fun v -> (1,v)) vs |> Linear.of_list
+  and quadratic = Quadratic.zero
+  in
+  Polynomial.{quadratic; linear}
+
+let random_quadratic ~vars1 ~vars2 ~len1 ~len2 =
+  let Polynomial.{linear = u; _} = random_linear ~vars:vars1 ~len:len1
+  and Polynomial.{linear = v; _} = random_linear ~vars:vars2 ~len:len2
+  in
+  let quadratic = multiply_linear u v and linear = Linear.zero in
+  Polynomial.{quadratic; linear}
+#+END_SRC
+
+
+
+* Symmetry Breakers
+
+We put the code for generating symmetry breakers into its own
+module. It has three optional and two required parameters. The
+required parameters are an array of transpositions which should be
+used for generating the permutations and the base polynomial
+\(h\). The optional arguments are ~exclude~ which determines which
+polynomials should not be returned as breakers (the default is to
+exclude only the zero polynomial); ~transpositions~ determines how many
+transpositions should be used to generate a single random
+permutations; and ~permutations~ determines how many random permutations
+will be generated and applied to \(h\).
+
+Note that we need to tell {{{OCaml}}} explicitly that the elements of
+the polynomial set are indeed polynomials. It also seems to be
+necessary to expose the set. Hiding it from the signature does not
+work. Maybe there is a more elegant solution---but for the moment I do
+not have time to search for it. (See, perhaps, this [[https://stackoverflow.com/questions/17976247/ocaml-type-incompatibilities-between-sets][SO discussion]] for
+some more details on the problem.)
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module Breakers : sig
+  module PolynomialSet : Set.S with type elt = Polynomial.t
+  
+  val generate :
+      ?exclude:(PolynomialSet.elt -> bool) ->
+      ?transpositions:int ->
+      ?permutations:int ->
+      Perm.t array -> Polynomial.t -> Polynomial.t Seq.t
+end = struct
+  (* module PolynomialSet : (Set.S with type elt = Polynomial.t) = Set.Make(Polynomial) *)
+  module PolynomialSet : (Set.S with type elt = Polynomial.t) = Set.Make(Polynomial)
+
+  let generate
+        ?(exclude = Polynomial.is_zero)
+        ?(transpositions = 50)
+        ?(permutations = 50) 
+        perms h =
+    Seq.init permutations
+      (fun _ -> Sample.with_replacement perms transpositions)
+    |> Seq.map (fun g -> Polynomial.(apply g h - h))
+    |> Seq.filter (fun h -> not (exclude h))
+    |> PolynomialSet.of_seq
+    |> PolynomialSet.to_seq
+end
+#+END_SRC
+
+
+
+
+* Experiments
+
+We also put the function which runs the actual experiments into a
+separate module. Its arguments are ~exclude~, ~transpositions~, and
+~permutations~ which are simply passed through to the breaker generating
+function. The argument ~repeat~ regulates how many times each experiment
+in run. (That is, how many times should a new base polynomial be
+generated and permutations be applied to it.) The argument ~base~
+generates a base polynomial. Finally, the arguments ~prefix~ and ~descr~
+are used to create the file name for the output of the experiment. In
+more detail, ~prefix~ will identify the instance of the bin-packing
+problem, while ~descr~ will describe how the base polynomials were
+generated.
+
+We will simulate picking random permutations by applying a sequence of
+\(p\) random (row or column) transpositions. We represent the product
+\(\pi_1 \pi_2 \cdots \pi_p\) of (row or column) permutations \(\pi_1,
+\ldots, \pi_p\) as list \([\pi_p; \ldots; \pi_1]\). Note the change in
+the order of the indices to make folding easier. (Of course, the
+indices do not matter for random permutations---but it is possible
+that we will use this with non-random permutations eventually.)
+
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+module Experiment = struct
+  let run
+        ?(exclude = Polynomial.is_zero)
+        ?(prefix = "hardnessA_halfcap_sorted_n200_B100_seed242")
+        ~transpositions
+        ~descr
+        ~permutations
+        ~repeat
+        base
+    =
+    for _ = 1 to repeat do
+      let s = Aux.seed () in
+      let h = base () in
+      let bs = Breakers.generate ~exclude ~permutations transpositions h in
+      let filename = Format.asprintf "%s__%s__seed%d.lp" prefix descr s in
+      let out = open_out filename in
+      let ff = Format.formatter_of_out_channel out in
+      let index = ref 0 in
+      let print h =
+        incr index;
+        Format.fprintf ff "sb%02d: %a <= 0\n" !index Polynomial.show h
+      in
+      Seq.iter print bs;
+      close_out out
+    done
+end
+#+END_SRC
+
+
+
+
+
+
+* Read the Size List Directly From a File
+
+I want to take the filename of an ~.LP~ file and read the size array
+from the file. {{{ME}}} seems to put it always as a comment in the
+second line. Here is an example for the first four lines from one of
+the ~.LP~ files.
+
+#+BEGIN_QUOTE
+\ Bin Packing MILP (LP format)
+\ B=100, n=200, sizes=[49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51]
+
+Minimize
+#+END_QUOTE
+
+
+I also want to try the ~Re~ library. (Needs to be installed via
+{{{Opam}}}.) We need to use the following command in order to build
+the program with the ~Re~ library.
+
+#+BEGIN_SRC bash :dir /tmp/ :results silent :eval never
+ocamlbuild -package re breakers.native
+#+END_SRC
+
+
+For reading the sizes, we first search for the sizes array and extract
+all the numbers. After splitting the number string into individual
+numbers, we parse them into proper integers.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let size_list line =
+  let re = Re.Emacs.re {|.*sizes=\[\([0-9, ]*\)\]|} |> Re.compile
+  and comma = Re.Emacs.re {|,|} |> Re.compile
+  in
+  Re.all re line
+  |> List.map (fun g -> Re.Group.get g 1)
+  |> List.concat_map (Re.split comma)
+  |> List.map String.trim
+  |> List.map int_of_string
+#+END_SRC
+
+
+
+This function reads an ~.LP~ file with the assumption that the sizes
+will be called out on the second line.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let get_sizes filename =
+  let lp = open_in filename in
+  ignore (input_line lp); (* skip first line *)
+  let line = input_line lp in
+  close_in lp;
+  size_list line
+#+END_SRC
+
+
+This is a poor man's clone of the {{{Shell}}} function of the same
+name. We use regular expressions. Note that the behaviour is different
+from the {{{Shell}}} function: if the string ends with a slash, then
+we return and empty string; and if the suffix is the entire string,
+then we also return the empty string.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let basename ?(suffix="") str =
+  let re = Re.Emacs.re {|\([^/]*\)$|} |> Re.compile
+  and sf = Re.Emacs.re (suffix ^ "$") |> Re.compile
+  in
+  Re.all re str
+  |> List.map (fun g -> Re.Group.get g 1)
+  |> List.hd
+  |> Re.replace sf ~f:(Fun.const "")
+#+END_SRC
+
+
+The following function find the ~.LP~ filename from the program
+arguments. More precisely, we simply return the first argument.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let set_up () =
+  if Array.length Sys.argv = 1
+  then failwith "Need the filename of an .LP file."
+  else
+    let arg = Sys.argv.(1) in
+    Format.printf "Processing: %s\n%!" arg;
+    arg
+#+END_SRC
+
+
+
+
+
+
+
+* Setting Up the Variables and Permutations
+
+Here is the list of sizes for this particular instance of the
+bin-packing problems. (We have simply copy&pasted it from {{{ME}}}'s
+files.) We determine the parameters \(m\) and \(n\) directly from the
+sizes list.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let filename = set_up ()
+
+let prefix = basename ~suffix:".lp" filename
+
+let sizes = get_sizes filename
+  
+let m = List.length sizes and n = List.length sizes
+#+END_SRC
+
+
+Next, we create the variables and permutations. For the (row)
+permutations, we need to compute the size boundaries from the sizes
+list.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let xs = Var.xs m n and ys = Var.ys n
+
+let vars = Array.concat [xs; ys]
+
+let boundaries = Aux.size_boundaries sizes
+
+let () =
+  let pp_sep ff () = Format.pp_print_string ff "; " in
+  let pp_list = Format.(pp_print_list ~pp_sep pp_print_int) in  
+  Format.printf "Size boundaries: [%a].\n%!" pp_list boundaries
+
+let row_perms = Perm.row_perms boundaries
+
+let col_perms = Perm.col_perms m
+
+let all_perms = Array.concat [col_perms; row_perms]
+#+END_SRC
+
+
+
+* Generating the Breakers
+
+** Overview
+
+We will set up the following experiments
+
+| Description  | Shape         | Remark                         |
+|--------------+---------------+--------------------------------|
+| Only \(x\)s  | \(x^2\)       |                                |
+| Only \(y\)s  | \(y^2\)       | needs only column permutations |
+| Mixed        | \(x y\)       |                                |
+| Separate     | \(x^2 + y^2\) |                                |
+| Linear \(x\) | \(x + y^2\)   | keep only quadratic breakers   |
+| Linear \(y\) | \(x^2 + y\)   | keep only quadratic breakers   |
+
+
+Here, we use a convenient shorthand notation where \(x\) represents a
+linear polynomial in the \(x\) variables rather than just a single
+variable. Also, \(x^2\) is meant to represent the product of two such
+linear polynomials (which can be different from each other). The same
+goes for \(y\) and the other terms.
+
+
+
+** Only \(x\)'s
+
+We start with a small number of variables and permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "few_vars_few_perms_only_xs"
+  and transpositions = all_perms
+  and base () =
+    random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 500
+  and repeat = 10
+  and descr = "few_vars_many_perms_only_xs"
+  and transpositions = all_perms
+  and base () =
+    random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "many_vars_few_perms_only_xs"
+  and transpositions = all_perms
+  and base () =
+    random_quadratic ~vars1:xs ~len1:25 ~vars2:xs ~len2:25
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+Thousands of variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "thousand_vars_few_perms_only_xs"
+  and transpositions = all_perms
+  and base () =
+    random_quadratic ~vars1:xs ~len1:64 ~vars2:xs ~len2:64
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+** Only \(y\)'s
+
+Here, we consider purely quadratic polynomials in the \(y\)'s only.
+
+We start with a small number of variables and permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "few_vars_few_perms_only_ys"
+  and transpositions = col_perms
+  and base () =
+    random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 500
+  and repeat = 10
+  and descr = "few_vars_many_perms_only_ys"
+  and transpositions = col_perms
+  and base () =
+    random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "many_vars_few_perms_only_ys"
+  and transpositions = col_perms
+  and base () =
+    random_quadratic ~vars1:ys ~len1:25 ~vars2:ys ~len2:25
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+A gaggle of variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "thousand_vars_few_perms_only_ys"
+  and transpositions = col_perms
+  and base () =
+    random_quadratic ~vars1:ys ~len1:64 ~vars2:ys ~len2:64
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+** Mixed
+
+We start with a small number of variables and permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "few_vars_few_perms_mixed"
+  and transpositions = all_perms
+  and base () =
+    random_quadratic ~vars1:xs ~len1:3 ~vars2:ys ~len2:3
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 500
+  and repeat = 10
+  and descr = "few_vars_many_perms_mixed"
+  and transpositions = all_perms
+  and base () =
+    random_quadratic ~vars1:xs ~len1:3 ~vars2:ys ~len2:3
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "many_vars_few_perms_mixed"
+  and transpositions = all_perms
+  and base () =
+    random_quadratic ~vars1:xs ~len1:25 ~vars2:ys ~len2:25
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+
+A whole lot of variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "thousand_vars_few_perms_mixed"
+  and transpositions = all_perms
+  and base () =
+    random_quadratic ~vars1:xs ~len1:64 ~vars2:xs ~len2:64
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+** Separate
+
+We start with a small number of variables and permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "few_vars_few_perms_separate"
+  and transpositions = all_perms
+  and base () =
+    let a = random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
+    and b = random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 500
+  and repeat = 10
+  and descr = "few_vars_many_perms_separate"
+  and transpositions = all_perms
+  and base () =
+    let a = random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
+    and b = random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "many_vars_few_perms_separate"
+  and transpositions = all_perms
+  and base () =
+    let a = random_quadratic ~vars1:xs ~len1:20 ~vars2:xs ~len2:20
+    and b = random_quadratic ~vars1:ys ~len1:20 ~vars2:ys ~len2:20
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+Really a lot of variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "thousand_vars_few_perms_separate"
+  and transpositions = all_perms
+  and base () =
+    let a = random_quadratic ~vars1:xs ~len1:64 ~vars2:xs ~len2:64
+    and b = random_quadratic ~vars1:ys ~len1:64 ~vars2:ys ~len2:64
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+
+** Linear \(x\)
+
+We start with a small number of variables and permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "few_vars_few_perms_linear_x"
+  and transpositions = all_perms
+  and exclude q = Polynomial.(is_zero q || is_linear q)
+  and base () =
+    let a = random_linear ~vars:xs ~len:7 
+    and b = random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 500
+  and repeat = 10
+  and descr = "few_vars_many_perms_linear_x"
+  and transpositions = all_perms
+  and exclude q = Polynomial.(is_zero q || is_linear q)
+  and base () =
+    let a = random_linear ~vars:xs ~len:7 
+    and b = random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "many_vars_few_perms_linear_x"
+  and transpositions = all_perms
+  and exclude q = Polynomial.(is_zero q || is_linear q)
+  and base () =
+    let a = random_linear ~vars:xs ~len:70 
+    and b = random_quadratic ~vars1:ys ~len1:20 ~vars2:ys ~len2:20
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+Really many more variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "thousand_vars_few_perms_linear_x"
+  and transpositions = all_perms
+  and exclude q = Polynomial.(is_zero q || is_linear q)
+  and base () =
+    let a = random_linear ~vars:xs ~len:(min 2500 (m * n))
+    and b = random_quadratic ~vars1:ys ~len1:50 ~vars2:ys ~len2:50
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+
+
+
+** Linear \(y\)
+
+We start with a small number of variables and permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "few_vars_few_perms_linear_y"
+  and transpositions = all_perms
+  and exclude q = Polynomial.(is_zero q || is_linear q)
+  and base () =
+    let a = random_linear ~vars:ys ~len:7 
+    and b = random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More permutations.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 500
+  and repeat = 10
+  and descr = "few_vars_many_perms_linear_y"
+  and transpositions = all_perms
+  and exclude q = Polynomial.(is_zero q || is_linear q)
+  and base () =
+    let a = random_linear ~vars:ys ~len:7 
+    and b = random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+More variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "many_vars_few_perms_linear_y"
+  and transpositions = all_perms
+  and exclude q = Polynomial.(is_zero q || is_linear q)
+  and base () =
+    let a = random_linear ~vars:ys ~len:70 
+    and b = random_quadratic ~vars1:xs ~len1:20 ~vars2:xs ~len2:20
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+Really many more variables.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "thousand_vars_few_perms_linear_y"
+  and transpositions = all_perms
+  and exclude q = Polynomial.(is_zero q || is_linear q)
+  and base () =
+    let a = random_linear ~vars:ys ~len:(min 2500 n)
+    and b = random_quadratic ~vars1:xs ~len1:50 ~vars2:xs ~len2:50
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+
+
+
+
+** Linear Polynomials in \(x\)
+
+Purely linear polynomials using only \(x\)'s.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "few_vars_few_perms_pure_linear_only_x"
+  and transpositions = all_perms
+  and base () = random_linear ~vars:xs ~len:10
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 500
+  and repeat = 10
+  and descr = "few_vars_many_perms_pure_linear_only_x"
+  and transpositions = all_perms
+  and base () = random_linear ~vars:xs ~len:10
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "many_vars_few_perms_pure_linear_only_x"
+  and transpositions = all_perms
+  and base () = random_linear ~vars:xs ~len:1_000
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "thousand_vars_few_perms_pure_linear_only_x"
+  and transpositions = all_perms
+  and base () = random_linear ~vars:xs ~len:4_000
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+
+** Linear Polynomials in \(y\)
+
+Purely linear polynomials using only \(y\)'s.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "few_vars_few_perms_pure_linear_only_y"
+  and transpositions = all_perms
+  and base () = random_linear ~vars:ys ~len:10
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 500
+  and repeat = 10
+  and descr = "few_vars_many_perms_pure_linear_only_y"
+  and transpositions = all_perms
+  and base () = random_linear ~vars:ys ~len:10
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "many_vars_few_perms_pure_linear_only_y"
+  and transpositions = all_perms
+  and base () = random_linear ~vars:ys ~len:1_000
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "thousand_vars_few_perms_pure_linear_only_y"
+  and transpositions = all_perms
+  and base () = random_linear ~vars:ys ~len:4_000
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+
+** Linear Polynomials in \(x\) and \(y\)
+
+Purely linear polynomials using \(x\)'s and \(y\)'s.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "few_vars_few_perms_pure_linear_x_and_y"
+  and transpositions = all_perms
+  and base () =
+    let a = random_linear ~vars:xs ~len:5
+    and b = random_linear ~vars:ys ~len:5
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 500
+  and repeat = 10
+  and descr = "few_vars_many_perms_pure_linear_x_and_y"
+  and transpositions = all_perms
+  and base () =
+    let a = random_linear ~vars:xs ~len:5
+    and b = random_linear ~vars:ys ~len:5
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+For the larger classes, we take more \(x\)'s than \(y\)'s simply
+because we do not have so many \(y\)'s.
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 5
+  and repeat = 10
+  and descr = "many_vars_few_perms_pure_linear_x_and_y"
+  and transpositions = all_perms
+  and base () =
+    let a = random_linear ~vars:xs ~len:750
+    and b = random_linear ~vars:ys ~len:250
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let () =  
+  let permutations = 50
+  and repeat = 10
+  and descr = "thousand_vars_few_perms_pure_linear_x_and_y"
+  and transpositions = all_perms
+  and base () =
+    let a = random_linear ~vars:xs ~len:3_000
+    and b = random_linear ~vars:ys ~len:1_000
+    in
+    Polynomial.(a + b)
+  in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+#+END_SRC
+
+
+
+
+* Making Breakers for All Files in a Directory
+
+This script runs the breaker generation for all ~.LP~ files in the
+current directory (assuming that the ~breakers.native~ binary is in the
+same directory). The results for each ~.LP~ are put into a zip file.
+
+#+BEGIN_SRC bash :tangle break_all.sh :mkdirp yes :eval never
+#!/bin/bash
+
+for I in *.lp
+do
+    B=`basename -s '.lp' "$I"`
+    breakers.native "$I"
+    zip "${B}__breakers.zip" "${B}__"*.lp
+    rm "${B}__"*.lp
+done
+#+END_SRC
+
+
+
+
+
+
+* Definitions                                                      :noexport:
+
+#+MACRO: ME Mǎdǎlina Eraşcu
+#+MACRO: JM Johannes Middeke
+
+#+MACRO: Emacs [[https://www.gnu.org/software/emacs/][Emacs]]
+#+MACRO: OCaml [[https://ocaml.org/][OCaml]]
+#+MACRO: LiterateProgramming [[https://cs.stanford.edu/~knuth/lp.html][literate programming]]
+#+MACRO: LaTeX [[https://www.latex-project.org/][LaTeX]]
+#+MACRO: Org [[https://orgmode.org/][Org mode]]
+#+MACRO: SymPy [[https://www.sympy.org/en/index.html][SymPy]]
+#+MACRO: Noweb [[https://orgmode.org/manual/Noweb-Reference-Syntax.html][Noweb]]
+#+MACRO: Gurobi [[https://docs.gurobi.com/current][Gurobi]]
+#+MACRO: Python [[https://www.python.org][Python]]
+#+MACRO: Bash [[https://www.gnu.org/software/bash/][Bash]]
+#+MACRO: Shell [[https://www.gnu.org/software/bash/][Shell]]
+#+MACRO: Opam [[https://opam.ocaml.org][opam]]
+#+MACRO: Haskell [[https://wiki.haskell.org/Haskell][Haskell]]
+
