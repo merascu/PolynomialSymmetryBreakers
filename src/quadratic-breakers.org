@@ -1492,7 +1492,7 @@ let () =
   and repeat = 10
   and descr = "thousand_vars_few_perms_pure_linear_only_y"
   and transpositions = all_perms
-  and base () = random_linear ~vars:ys ~len:4_000
+  and base () = random_linear ~vars:ys ~len:1_500
   in
   Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
 #+END_SRC
