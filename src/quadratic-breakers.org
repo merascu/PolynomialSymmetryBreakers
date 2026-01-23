@@ -2,7 +2,6 @@
 #+AUTHOR: Johannes Middeke and Mǎdǎlina Eraşcu
 #+DATE: January 2026
 
-
 * Overview and Compilation
 
 The program is written in a {{{LiterateProgramming}}} style using
@@ -954,14 +953,17 @@ let all_perms = Array.concat [col_perms; row_perms]
 
 We will set up the following experiments
 
-| Description  | Shape         | Remark                         |
-|--------------+---------------+--------------------------------|
-| Only \(x\)s  | \(x^2\)       |                                |
-| Only \(y\)s  | \(y^2\)       | needs only column permutations |
-| Mixed        | \(x y\)       |                                |
-| Separate     | \(x^2 + y^2\) |                                |
-| Linear \(x\) | \(x + y^2\)   | keep only quadratic breakers   |
-| Linear \(y\) | \(x^2 + y\)   | keep only quadratic breakers   |
+| Description                         | Shape         | Remark                         |
+|-------------------------------------+---------------+--------------------------------|
+| Only \(x\)s                         | \(x^2\)       |                                |
+| Only \(y\)s                         | \(y^2\)       | needs only column permutations |
+| Mixed                               | \(x y\)       |                                |
+| Separate                            | \(x^2 + y^2\) |                                |
+| Linear \(x\)                        | \(x + y^2\)   | keep only quadratic breakers   |
+| Linear \(y\)                        | \(x^2 + y\)   | keep only quadratic breakers   |
+| Purely linear, \(x\) only           | \(x\)         |                                |
+| Purely linear, \(y\) only           | \(y\)         | needs only column permutations |
+| Purely linear, \(x\) and \(y\) only | \(x + y\)     |                                |
 
 
 Here, we use a convenient shorthand notation where \(x\) represents a
@@ -972,601 +974,248 @@ goes for \(y\) and the other terms.
 
 
 
-** Only \(x\)'s
-
-We start with a small number of variables and permutations.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "few_vars_few_perms_only_xs"
-  and transpositions = all_perms
-  and base () =
-    random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
 
 
-More permutations.
 
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 500
-  and repeat = 10
-  and descr = "few_vars_many_perms_only_xs"
-  and transpositions = all_perms
-  and base () =
-    random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
+** Generate Experiments from Specifications
 
+In order to simplify coding the experiments, we are going to define a
+dedicated data type. This data type will include a specificiation
+which describes how the base polynomials are to be generated. We
+define the type for the specificiations first. It consists of four
+cases for linear polynomials, squares, quadratic polynomials, and sums
+of the aforementioned three types. For each type, we can specificy the
+kind of variables (either \(x\)'s or \(y\)'s) and how many variables
+to use. For example, ~Sq (X, 2)~ would generate a product of two linear
+polynomials in the \(x\)'s which both have two terms. (Recall that
+these two linear polynomials are generated independently. Thus, the
+name "square" is somewhat misleading.)
 
-More variables.
+We add a function that turns a specificiation into an actual
+polynomial by calling the corresponding random polynomial functions.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "many_vars_few_perms_only_xs"
-  and transpositions = all_perms
-  and base () =
-    random_quadratic ~vars1:xs ~len1:25 ~vars2:xs ~len2:25
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
+type var = X | Y
 
+type spec =
+  | Lin of (var * int)
+  | Sq of (var * int)
+  | Quad of (var * int * var * int)
+  | Sum of spec list
 
-Thousands of variables.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "thousand_vars_few_perms_only_xs"
-  and transpositions = all_perms
-  and base () =
-    random_quadratic ~vars1:xs ~len1:64 ~vars2:xs ~len2:64
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-** Only \(y\)'s
-
-Here, we consider purely quadratic polynomials in the \(y\)'s only.
-
-We start with a small number of variables and permutations.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "few_vars_few_perms_only_ys"
-  and transpositions = col_perms
-  and base () =
-    random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-More permutations.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 500
-  and repeat = 10
-  and descr = "few_vars_many_perms_only_ys"
-  and transpositions = col_perms
-  and base () =
-    random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-More variables.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "many_vars_few_perms_only_ys"
-  and transpositions = col_perms
-  and base () =
-    random_quadratic ~vars1:ys ~len1:25 ~vars2:ys ~len2:25
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-A gaggle of variables.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "thousand_vars_few_perms_only_ys"
-  and transpositions = col_perms
-  and base () =
-    random_quadratic ~vars1:ys ~len1:64 ~vars2:ys ~len2:64
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-** Mixed
-
-We start with a small number of variables and permutations.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "few_vars_few_perms_mixed"
-  and transpositions = all_perms
-  and base () =
-    random_quadratic ~vars1:xs ~len1:3 ~vars2:ys ~len2:3
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-More permutations.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 500
-  and repeat = 10
-  and descr = "few_vars_many_perms_mixed"
-  and transpositions = all_perms
-  and base () =
-    random_quadratic ~vars1:xs ~len1:3 ~vars2:ys ~len2:3
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-More variables.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "many_vars_few_perms_mixed"
-  and transpositions = all_perms
-  and base () =
-    random_quadratic ~vars1:xs ~len1:25 ~vars2:ys ~len2:25
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+let rec of_spec = function
+  | Lin (X, n) -> random_linear ~vars:xs ~len:n
+  | Lin (Y, n) -> random_linear ~vars:ys ~len:n
+  | Sq (X, n) -> random_quadratic ~vars1:xs ~len1:n ~vars2:xs ~len2:n
+  | Sq (Y, n) -> random_quadratic ~vars1:ys ~len1:n ~vars2:ys ~len2:n
+  | Quad (X, m, X, n) -> random_quadratic ~vars1:xs ~len1:m ~vars2:xs ~len2:n
+  | Quad (X, m, Y, n) -> random_quadratic ~vars1:xs ~len1:m ~vars2:ys ~len2:n
+  | Quad (Y, m, X, n) -> random_quadratic ~vars1:ys ~len1:m ~vars2:xs ~len2:n
+  | Quad (Y, m, Y, n) -> random_quadratic ~vars1:ys ~len1:m ~vars2:ys ~len2:n
+  | Sum sps ->
+     List.map of_spec sps |> List.fold_left Polynomial.add Polynomial.zero
 #+END_SRC
 
 
 
-A whole lot of variables.
+An experiment specification consists of
+
++ the number of permutations to use (ie, the maximal number of
+  different breakers which will be generated),
++ a function which determines which polynomials to include in the
+  output,
++ a textual description of the experiment, 
++ the pool of transpositions from which to generate the permutations,
+  and
++ a specificiation for the base polynomial.
+
+
+We provide abbreviations for the two most common exclusion
+criteria. Moreover, we provide a function which allows to run a
+specificiation directly.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "thousand_vars_few_perms_mixed"
-  and transpositions = all_perms
-  and base () =
-    random_quadratic ~vars1:xs ~len1:64 ~vars2:xs ~len2:64
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+type experiment = {
+    permutations : int;
+    exclude : Polynomial.t -> bool;
+    descr : string;
+    transpositions : Perm.t array;
+    base : spec   
+  }
+
+let no_linear q = Polynomial.(is_zero q || is_linear q)
+and no_zero q = Polynomial.is_zero q
+
+let run ~prefix ~repeat {permutations; descr; transpositions; base} =
+  let base_gen () = of_spec base in
+  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base_gen
 #+END_SRC
 
 
-** Separate
+We will generate the actual code for the experiments from the tables
+below using the power of {{{Org}}} and {{{Noweb}}}. The tables have
+sixe columns:
 
-We start with a small number of variables and permutations.
++ Vars :: a descriptive label for the number of variables in the
+  experiment,
++ Perms :: a descriptive label for the number of permutations in the
+  experiment,
++ Class :: a shorthand for the shape of the generated base polynomial,
++ Specifications :: the exact shape of the generated base polynomial,
++ Permutations :: how many permutations to apply (ie, the maximal
+  number of inequalities generated from the base polynomial),
++ Transpositions :: which kind of transpositions to use.
 
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "few_vars_few_perms_separate"
-  and transpositions = all_perms
-  and base () =
-    let a = random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
-    and b = random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
+
+The tables are read by the {{{ELisp}}} code below and automatically
+translated into {{{OCaml}}} syntax when the source code is tangled. It
+creates a list called ~experiments~ which contains all the experiments
+specified in the given table. (Currently, the table has to specified
+by hand in this {{{Org}}} file.) Note that the ~Vars~, ~Perms~, and ~Class~
+columns are combined into a single description string.
+
+#+NAME: generate-experiments
+#+HEADER: :var table=experiments-2000 :colnames yes
+#+BEGIN_SRC emacs-lisp :tangle no :exports both :noweb no :results value :wrap example
+(let ((experiments 
+       (cl-loop for (vars perms class spec num-perms transps excl) in table
+		for descr = (format "descr = \"%s_vars_%s_perms_%s\""
+				    vars perms class)
+		for base = (format "base = %s" spec)
+		for permutations = (format "permutations = %s" num-perms)
+		for transpositions = (format "transpositions = %s" transps)
+		for exclude = (format "exclude = %s" excl)
+		for experiment = (format "{%s; %s; %s; %s; %s}"
+					 permutations descr transpositions
+					 base exclude)
+		collect experiment)))
+  (concat "let experiments = ["
+	  (string-join experiments "; ")
+	  "]"))
 #+END_SRC
 
 
-More permutations.
+The following source code block includes the reference to the
+{{{ELisp}}} code in {{{Noweb}}} syntax. It will be replaced by the
+generated code during tangling.
 
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 500
-  and repeat = 10
-  and descr = "few_vars_many_perms_separate"
-  and transpositions = all_perms
-  and base () =
-    let a = random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
-    and b = random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
+We also include the main function in this code block. It simply
+executes every one of the experiments \(10\) times.
 
+#+BEGIN_SRC ocaml :tangle breakers.ml :noweb no-export
+<<generate-experiments(table=experiments-1000)>>
 
-More variables.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "many_vars_few_perms_separate"
-  and transpositions = all_perms
-  and base () =
-    let a = random_quadratic ~vars1:xs ~len1:20 ~vars2:xs ~len2:20
-    and b = random_quadratic ~vars1:ys ~len1:20 ~vars2:ys ~len2:20
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-Really a lot of variables.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "thousand_vars_few_perms_separate"
-  and transpositions = all_perms
-  and base () =
-    let a = random_quadratic ~vars1:xs ~len1:64 ~vars2:xs ~len2:64
-    and b = random_quadratic ~vars1:ys ~len1:64 ~vars2:ys ~len2:64
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-
-** Linear \(x\)
-
-We start with a small number of variables and permutations.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "few_vars_few_perms_linear_x"
-  and transpositions = all_perms
-  and exclude q = Polynomial.(is_zero q || is_linear q)
-  and base () =
-    let a = random_linear ~vars:xs ~len:7 
-    and b = random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-More permutations.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 500
-  and repeat = 10
-  and descr = "few_vars_many_perms_linear_x"
-  and transpositions = all_perms
-  and exclude q = Polynomial.(is_zero q || is_linear q)
-  and base () =
-    let a = random_linear ~vars:xs ~len:7 
-    and b = random_quadratic ~vars1:ys ~len1:3 ~vars2:ys ~len2:3
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-More variables.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "many_vars_few_perms_linear_x"
-  and transpositions = all_perms
-  and exclude q = Polynomial.(is_zero q || is_linear q)
-  and base () =
-    let a = random_linear ~vars:xs ~len:70 
-    and b = random_quadratic ~vars1:ys ~len1:20 ~vars2:ys ~len2:20
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-Really many more variables.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "thousand_vars_few_perms_linear_x"
-  and transpositions = all_perms
-  and exclude q = Polynomial.(is_zero q || is_linear q)
-  and base () =
-    let a = random_linear ~vars:xs ~len:(min 2500 (m * n))
-    and b = random_quadratic ~vars1:ys ~len1:50 ~vars2:ys ~len2:50
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
+let main = List.iter (run ~prefix ~repeat:10) experiments
 #+END_SRC
 
 
 
+** \(n = 2\,000\)
 
+Here is a table with the exact experimental setup for \(n =
+2\,000\). Note that for this setting we have \(2\,000\) versions of
+\(y\) and \(2\,000^2 = 4\,000\,000\) versions of \(x\).
 
-** Linear \(y\)
-
-We start with a small number of variables and permutations.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "few_vars_few_perms_linear_y"
-  and transpositions = all_perms
-  and exclude q = Polynomial.(is_zero q || is_linear q)
-  and base () =
-    let a = random_linear ~vars:ys ~len:7 
-    and b = random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-More permutations.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 500
-  and repeat = 10
-  and descr = "few_vars_many_perms_linear_y"
-  and transpositions = all_perms
-  and exclude q = Polynomial.(is_zero q || is_linear q)
-  and base () =
-    let a = random_linear ~vars:ys ~len:7 
-    and b = random_quadratic ~vars1:xs ~len1:3 ~vars2:xs ~len2:3
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-More variables.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "many_vars_few_perms_linear_y"
-  and transpositions = all_perms
-  and exclude q = Polynomial.(is_zero q || is_linear q)
-  and base () =
-    let a = random_linear ~vars:ys ~len:70 
-    and b = random_quadratic ~vars1:xs ~len1:20 ~vars2:xs ~len2:20
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-Really many more variables.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "thousand_vars_few_perms_linear_y"
-  and transpositions = all_perms
-  and exclude q = Polynomial.(is_zero q || is_linear q)
-  and base () =
-    let a = random_linear ~vars:ys ~len:(min 2500 n)
-    and b = random_quadratic ~vars1:xs ~len1:50 ~vars2:xs ~len2:50
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~exclude ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
+#+NAME: experiments-2000
+| Vars     | Perms | Class               | Specification                      | Permutations | Transpositions | Exclude   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| few      | few   | only_x              | Sq (X, 3)                          |           50 | all_perms      | no_zero   |
+| few      | few   | only_y              | Sq (Y, 3)                          |           50 | col_perms      | no_zero   |
+| few      | few   | mixed               | Quad (X, 3, Y, 3)                  |           50 | all_perms      | no_zero   |
+| few      | few   | separate            | Sum [Sq (X, 3); Sq (Y, 3)]         |           50 | all_perms      | no_zero   |
+| few      | few   | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]        |           50 | all_perms      | no_linear |
+| few      | few   | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]        |           50 | all_perms      | no_linear |
+| few      | few   | pure_linear_only_x  | Lin (X, 10)                        |           50 | all_perms      | no_zero   |
+| few      | few   | pure_linear_only_y  | Lin (Y, 10)                        |           50 | col_perms      | no_zero   |
+| few      | few   | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]       |           50 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| few      | many  | only_x              | Sq (X, 3)                          |          500 | all_perms      | no_zero   |
+| few      | many  | only_y              | Sq (Y, 3)                          |          500 | col_perms      | no_zero   |
+| few      | many  | mixed               | Quad (X, 3, Y, 3)                  |          500 | all_perms      | no_zero   |
+| few      | many  | separate            | Sum [Sq (X, 3); Sq (Y, 3)]         |          500 | all_perms      | no_zero   |
+| few      | many  | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]        |          500 | all_perms      | no_linear |
+| few      | many  | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]        |          500 | all_perms      | no_linear |
+| few      | many  | pure_linear_only_x  | Lin (X, 10)                        |          500 | all_perms      | no_zero   |
+| few      | many  | pure_linear_only_y  | Lin (Y, 10)                        |          500 | col_perms      | no_zero   |
+| few      | many  | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]       |          500 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| many     | few   | only_x              | Sq (X, 25)                         |           50 | all_perms      | no_zero   |
+| many     | few   | only_y              | Sq (Y, 25)                         |           50 | col_perms      | no_zero   |
+| many     | few   | mixed               | Quad (X, 25, Y, 25)                |           50 | all_perms      | no_zero   |
+| many     | few   | separate            | Sum [Sq (X, 20); Sq (Y, 20)]       |           50 | all_perms      | no_zero   |
+| many     | few   | linear_x            | Sum [Lin (X, 70); Sq (Y, 20)]      |           50 | all_perms      | no_linear |
+| many     | few   | linear_y            | Sum [Sq (X, 20); Lin (Y, 70)]      |           50 | all_perms      | no_linear |
+| many     | few   | pure_linear_only_x  | Lin (X, 1000)                      |           50 | all_perms      | no_zero   |
+| many     | few   | pure_linear_only_y  | Lin (Y, 1000)                      |           50 | col_perms      | no_zero   |
+| many     | few   | pure_linear_x_and_y | Sum [Lin (X, 750); Lin (Y, 250)]   |           50 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| numerous | few   | only_x              | Sq (X, 64)                         |           50 | all_perms      | no_zero   |
+| numerous | few   | only_y              | Sq (Y, 64)                         |           50 | col_perms      | no_zero   |
+| numerous | few   | mixed               | Quad (X, 64, Y, 64)                |           50 | all_perms      | no_zero   |
+| numerous | few   | separate            | Sum [Sq (X, 64); Sq (Y, 64)]       |           50 | all_perms      | no_zero   |
+| numerous | few   | linear_x            | Sum [Lin (X, 2500); Sq (Y, 50)]    |           50 | all_perms      | no_linear |
+| numerous | few   | linear_y            | Sum [Sq (X, 50); Lin (Y, 2000)]    |           50 | all_perms      | no_linear |
+| numerous | few   | pure_linear_only_x  | Lin (X, 4000)                      |           50 | all_perms      | no_zero   |
+| numerous | few   | pure_linear_only_y  | Lin (Y, 1500)                      |           50 | col_perms      | no_zero   |
+| numerous | few   | pure_linear_x_and_y | Sum [Lin (X, 3000); Lin (Y, 1000)] |           50 | all_perms      | no_zero   |
 
 
 
+** \(n = 1\,000\)
+
+For \(n = 1\,000, 1\,021, 1\,024\), we modify the number of variables
+per term as shown in the table below. (Note that only the
+specification column has changed---all the other columns remain the
+same.) Note also that for the \(n = 1\,000\) case there are \(1\,000\)
+many \(y\)'s and \(1\,000\,000\) many \(x\)'s.
+
+As far as the concrete changes are concerned, we leave the "few"
+variables cases untouched and only lower the number of variables for
+the "many" and "numerous" variable cases.
 
 
-
-** Linear Polynomials in \(x\)
-
-Purely linear polynomials using only \(x\)'s.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "few_vars_few_perms_pure_linear_only_x"
-  and transpositions = all_perms
-  and base () = random_linear ~vars:xs ~len:10
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 500
-  and repeat = 10
-  and descr = "few_vars_many_perms_pure_linear_only_x"
-  and transpositions = all_perms
-  and base () = random_linear ~vars:xs ~len:10
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "many_vars_few_perms_pure_linear_only_x"
-  and transpositions = all_perms
-  and base () = random_linear ~vars:xs ~len:1_000
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "thousand_vars_few_perms_pure_linear_only_x"
-  and transpositions = all_perms
-  and base () = random_linear ~vars:xs ~len:4_000
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-
-** Linear Polynomials in \(y\)
-
-Purely linear polynomials using only \(y\)'s.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "few_vars_few_perms_pure_linear_only_y"
-  and transpositions = all_perms
-  and base () = random_linear ~vars:ys ~len:10
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 500
-  and repeat = 10
-  and descr = "few_vars_many_perms_pure_linear_only_y"
-  and transpositions = all_perms
-  and base () = random_linear ~vars:ys ~len:10
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "many_vars_few_perms_pure_linear_only_y"
-  and transpositions = all_perms
-  and base () = random_linear ~vars:ys ~len:1_000
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "thousand_vars_few_perms_pure_linear_only_y"
-  and transpositions = all_perms
-  and base () = random_linear ~vars:ys ~len:1_500
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-
-** Linear Polynomials in \(x\) and \(y\)
-
-Purely linear polynomials using \(x\)'s and \(y\)'s.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "few_vars_few_perms_pure_linear_x_and_y"
-  and transpositions = all_perms
-  and base () =
-    let a = random_linear ~vars:xs ~len:5
-    and b = random_linear ~vars:ys ~len:5
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 500
-  and repeat = 10
-  and descr = "few_vars_many_perms_pure_linear_x_and_y"
-  and transpositions = all_perms
-  and base () =
-    let a = random_linear ~vars:xs ~len:5
-    and b = random_linear ~vars:ys ~len:5
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-
-For the larger classes, we take more \(x\)'s than \(y\)'s simply
-because we do not have so many \(y\)'s.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 5
-  and repeat = 10
-  and descr = "many_vars_few_perms_pure_linear_x_and_y"
-  and transpositions = all_perms
-  and base () =
-    let a = random_linear ~vars:xs ~len:750
-    and b = random_linear ~vars:ys ~len:250
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let () =  
-  let permutations = 50
-  and repeat = 10
-  and descr = "thousand_vars_few_perms_pure_linear_x_and_y"
-  and transpositions = all_perms
-  and base () =
-    let a = random_linear ~vars:xs ~len:3_000
-    and b = random_linear ~vars:ys ~len:1_000
-    in
-    Polynomial.(a + b)
-  in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base
-#+END_SRC
-
+#+NAME: experiments-1000
+| Vars     | Perms | Class               | Specification                      | Permutations | Transpositions | Exclude   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| few      | few   | only_x              | Sq (X, 3)                          |           50 | all_perms      | no_zero   |
+| few      | few   | only_y              | Sq (Y, 3)                          |           50 | col_perms      | no_zero   |
+| few      | few   | mixed               | Quad (X, 3, Y, 3)                  |           50 | all_perms      | no_zero   |
+| few      | few   | separate            | Sum [Sq (X, 3); Sq (Y, 3)]         |           50 | all_perms      | no_zero   |
+| few      | few   | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]        |           50 | all_perms      | no_linear |
+| few      | few   | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]        |           50 | all_perms      | no_linear |
+| few      | few   | pure_linear_only_x  | Lin (X, 10)                        |           50 | all_perms      | no_zero   |
+| few      | few   | pure_linear_only_y  | Lin (Y, 10)                        |           50 | col_perms      | no_zero   |
+| few      | few   | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]       |           50 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| few      | many  | only_x              | Sq (X, 3)                          |          500 | all_perms      | no_zero   |
+| few      | many  | only_y              | Sq (Y, 3)                          |          500 | col_perms      | no_zero   |
+| few      | many  | mixed               | Quad (X, 3, Y, 3)                  |          500 | all_perms      | no_zero   |
+| few      | many  | separate            | Sum [Sq (X, 3); Sq (Y, 3)]         |          500 | all_perms      | no_zero   |
+| few      | many  | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]        |          500 | all_perms      | no_linear |
+| few      | many  | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]        |          500 | all_perms      | no_linear |
+| few      | many  | pure_linear_only_x  | Lin (X, 10)                        |          500 | all_perms      | no_zero   |
+| few      | many  | pure_linear_only_y  | Lin (Y, 10)                        |          500 | col_perms      | no_zero   |
+| few      | many  | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]       |          500 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| many     | few   | only_x              | Sq (X, 12)                         |           50 | all_perms      | no_zero   |
+| many     | few   | only_y              | Sq (Y, 12)                         |           50 | col_perms      | no_zero   |
+| many     | few   | mixed               | Quad (X, 12, Y, 12)                |           50 | all_perms      | no_zero   |
+| many     | few   | separate            | Sum [Sq (X, 10); Sq (Y, 10)]       |           50 | all_perms      | no_zero   |
+| many     | few   | linear_x            | Sum [Lin (X, 100); Sq (Y, 10)]     |           50 | all_perms      | no_linear |
+| many     | few   | linear_y            | Sum [Sq (X, 10); Lin (Y, 100)]     |           50 | all_perms      | no_linear |
+| many     | few   | pure_linear_only_x  | Lin (X, 500)                       |           50 | all_perms      | no_zero   |
+| many     | few   | pure_linear_only_y  | Lin (Y, 300)                       |           50 | col_perms      | no_zero   |
+| many     | few   | pure_linear_x_and_y | Sum [Lin (X, 300); Lin (Y, 100)]   |           50 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| numerous | few   | only_x              | Sq (X, 30)                         |           50 | all_perms      | no_zero   |
+| numerous | few   | only_y              | Sq (Y, 30)                         |           50 | col_perms      | no_zero   |
+| numerous | few   | mixed               | Quad (X, 30, Y, 30)                |           50 | all_perms      | no_zero   |
+| numerous | few   | separate            | Sum [Sq (X, 30); Sq (Y, 30)]       |           50 | all_perms      | no_zero   |
+| numerous | few   | linear_x            | Sum [Lin (X, 800); Sq (Y, 30)]     |           50 | all_perms      | no_linear |
+| numerous | few   | linear_y            | Sum [Sq (X, 30); Lin (Y, 500)]     |           50 | all_perms      | no_linear |
+| numerous | few   | pure_linear_only_x  | Lin (X, 1000)                      |           50 | all_perms      | no_zero   |
+| numerous | few   | pure_linear_only_y  | Lin (Y, 800)                       |           50 | col_perms      | no_zero   |
+| numerous | few   | pure_linear_x_and_y | Sum [Lin (X, 1200); Lin (Y, 500)]  |           50 | all_perms      | no_zero   |
 
 
 
@@ -1599,6 +1248,7 @@ done
 #+MACRO: JM Johannes Middeke
 
 #+MACRO: Emacs [[https://www.gnu.org/software/emacs/][Emacs]]
+#+MACRO: ELisp [[https://www.gnu.org/software/emacs/manual/html_node/eintr/][Emacs Lisp]]
 #+MACRO: OCaml [[https://ocaml.org/][OCaml]]
 #+MACRO: LiterateProgramming [[https://cs.stanford.edu/~knuth/lp.html][literate programming]]
 #+MACRO: LaTeX [[https://www.latex-project.org/][LaTeX]]
