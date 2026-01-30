@@ -1,4 +1,4 @@
-# TODO Polynomial Symmetry Breakers
+# Automatic Generation of Polynomial Symmetry Breakers
 ## Table of Contents
 
 - [Introduction](#introduction)
@@ -10,79 +10,59 @@
 
 ## Introduction
 
-With the rising importance of Cloud deployment, organizations face the intricate task of optimally deploying component-based applications on diverse Virtual Machine (VM) offerings. While robust solutions like Kubernetes and AWS Elastic Beanstalk exist, they don't target this specific challenge efficiently.
+Symmetry in integer programming causes redundant search and is often handled with symmetry breaking constraints that remove as many equivalent solutions as possible. We propose an algebraic method which allows to generate a random family of polynomial inequalities which can be used as symmetry breakers. The method requires as input an arbitrary base polynomial and a group of permutations which is pecific to the integer program. The computations can be easily carried out in any major symbolic computation software. In order to test our approach, we describe a case study on near half-capacity 0-1 bin packing instances which exhibit substantial symmetries. We statically generate random quadratic breakers and add them to a baseline integer programming problem which we then solve with Gurobi. It turns out that simple symmetry breakers, especially combining few variables and permutations, most consistently reduce work time.
 
-This project introduces a unique approach combining Graph Neural Networks (GNNs) and the SMT solver Z3. Leveraging GNNs' capability to interpret graph-structured data, we model past deployments as graphs, enabling the prediction of optimal VM assignments based on historical data.
-
-By using these GNN-based predictions as soft constraints in Z3, we enhance search efficiency, making the deployment process both more efficient and cost-effective in many cases.
-
-This repository accompanies the paper *Neuro-Symbolic Constrained Optimization for Cloud Application Deployment via Graph Neural Networks and Satisfiability Modulo Theory* submitted to  [Constraints](https://link.springer.com/journal/10601) journal but rejected. 
-
-
-## Features
-
-1. **Dataset Generation:** 
-   - Generate a dataset to train the GNN model for the application deployment.
-   - For a detailed look into the data generation process run: 🔗 [src/generate_dataset.py](./src/generate_dataset.py)
-
-2. **GNN Model Implementation:**
-   - Construct and train the GNN model able to predict component-to-VM assignments and VM Offer types.
-   - Save trained model for future use.
-   - Explore the implementation: 🔗 [src/trainRGCN.py](./src/trainRGCN.py)
-   - 🔗 Saved Model: [Models/GNNs/Models_20_7_Datasets-improved-Gini/Models_20_7_SecureBillingEmail-improved-Gini/model_RGCN_1000_samples_100_epochs_32_batchsize.pth](./Models/GNNs/Models_20_7_Datasets-improved-Gini/Models_20_7_SecureWebContainer-improved-Gini/model_RGCN_1000_samples_100_epochs_32_batchsize.pth)
-
-3. **Integration with SMT Solver Z3:**
-   - Transform GNN predictions into soft constraints.
-   - Guide the Z3 solver towards an optimal solution using these constraints.
-   - See: 🔗 [src/Wrapper_GNN_Z3.py](./src/Wrapper_GNN_Z3.py)
+This repository accompanies the paper *NAutomatic Generation of Polynomial Symmetry Breaking Constraints* submitted to [ISSAC 2026](https://www.issac-conference.org/2026/). 
 
 ## Installation
 
 ### 1. Clone the repository
 
 ```
-git clone https://github.com/SAGE-Project/SAGE-GNN.git
-cd SAGE-GNN
+git clone [https://github.com/SAGE-Project/SAGE-GNN.git](https://github.com/merascu/PolynomialSymmetryBreakers.git)
+cd PolynomialSymmetryBreakers
 ```
 
-### 2. Setting Up a Conda Environment
+### 2. Install Dependencies
 
-- First, make sure you have [Anaconda](https://www.anaconda.com/products/distribution) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed on your system.
+This project relies on the following libraries and tools:
 
-- **Create a new environment** (replace "myenv" with your desired environment name):
-
-```bash
-conda create --name myenv python=3.10
-```
-
-- **Activate the environment**:
-```bash
-conda activate myenv
-```
-
-### 3. Install Dependencies
-
-This project relies on the following open-source libraries and tools:
-
-- **Python (v3.10)**
-- **Deep Graph Library (DGL v0.91)**
-- **PyTorch (v1.13.0)**
-- **CUDA (v11.6)**
+- **Python (v3.9.6)**
+- **Gurobi (v13.0.0)**
 
 Please ensure you have these dependencies installed and configured correctly before running the project.
 
-## Usage
+## Features and Usage
 
-Using the already trained GNN models ([Models/GNNs](Models/GNNs/)) and an application description ([Models/json](Models/json/)) **compare** the results between:
-   - Base solver, and
-   - Base solver augumented with softconstraints extracted from the GNN (Base solver + GNN),
-   - See: 🔗 [src/comparison.py](./src/comparison.py). 
-   - The output are SMT-LIB files describing a constraint optimization problem together with the solution. See: [Output/SMT-LIB/SecureWebContainer](Output/SMT-LIB/SecureWebContainer)
+1. **Bin Packing LP Instance Generation**
+   - Generate **0–1 bin packing** MILP instances in **LP format** (near half-capacity size classes).
+   - Example:
+     ```bash
+     python bin_packing_problem_generator.py --B=100 --n=2000 --classes=5 --seed=2042
+     ```
+   - Code: 🔗 [bin_packing_problem_generator.py](./bin_packing_problem_generator.py)
 
-Additionally, statistics can be run to answer the following research questions:
-   - **RQ1**: How does scalability of the hybrid approach vary with the number of available VM Offers and with increasing number of component instances which also changes the dynamics of component interactions? See: [utils/RQ1/scalability_GNN_offers.py](utils/RQ1/scalability_GNN_offers.py)
-   - **RQ2**: Is there a correlation between the GNN predictions and the optimal solution? Furthermore, is there a relationship between solution time and the optimal solution? See: [utils/RQ2/price-optimality.py](utils/RQ2/price-optimality.py)
-   - **RQ3**: Are there specific GNNs tailored for particular use cases that simultaneously predict well the assignments of components to VMs while minimizing execution time and achieving optimal solution? See: [utils/RQ3/readme](utils/RQ3/readme)
+2. **Augment LPs with Symmetry-Breaking Snippets**
+   - Read a **base LP**, read all constraint snippet files from a directory, and **insert** each snippet **right before the `Binary` section**, producing one augmented LP per snippet.
+   - Run:
+     ```bash
+     python gen_files_with_sbs.py base_lp_file="base.lp" sbs_dir="snippets/" gen_lp_files="out_lps/"
+     ```
+   - Code: 🔗 [gen_files_with_sbs.py](./gen_files_with_sbs.py)
+
+3. **Batch Solve LPs with Gurobi**
+   - Solve every `*.lp` in a directory using `gurobi_cl`, writing a `*.out` log and appending the `*.sol` solution to it.
+   - Uses: `NonConvex=2`, `Presolve=0`, `Symmetry=0`, `WorkLimit=1800`.
+   - Script: 🔗 [run_all_lp_with_Gurobi.sh](./run_all_lp_with_Gurobi.sh)
+
+4. **Extract Solver Metrics to CSV**
+   - Parse solver logs/outputs and extract: **file name**, **runtime**, **work units**, and **objective (if optimal)** into a CSV.
+   - Run:
+     ```bash
+     python extract_to_csv.py path/to/logs results.csv --glob "*.out"
+     ```
+   - Code: 🔗 [extract_to_csv.py](./extract_to_csv.py)
+5. **Johannes**
 
 ## License
 
