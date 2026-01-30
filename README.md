@@ -3,7 +3,7 @@
 
 - [Introduction](#introduction)
 - [Installation](#installation)
-- [Features and Usage](#features)
+- [Features and Usage](#features and usage)
 - [License](#license)
 
 
