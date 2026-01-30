@@ -2,9 +2,8 @@
 ## Table of Contents
 
 - [Introduction](#introduction)
-- [Features](#features)
 - [Installation](#installation)
-- [Usage](#usage)
+- [Features and Usage](#features)
 - [License](#license)
 
 
