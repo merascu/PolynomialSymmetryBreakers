@@ -18,7 +18,7 @@ This repository accompanies the paper *NAutomatic Generation of Polynomial Symme
 ### 1. Clone the repository
 
 ```
-git clone [https://github.com/SAGE-Project/SAGE-GNN.git](https://github.com/merascu/PolynomialSymmetryBreakers.git)
+git clone https://github.com/merascu/PolynomialSymmetryBreakers.git
 cd PolynomialSymmetryBreakers
 ```
 
@@ -27,7 +27,7 @@ cd PolynomialSymmetryBreakers
 This project relies on the following libraries and tools:
 
 - **Python (v3.9.6)**
-- **Gurobi (v13.0.0)**
+- **Gurobi (v13.0.0), Academic License**
 
 Please ensure you have these dependencies installed and configured correctly before running the project.
 
@@ -39,7 +39,7 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```bash
      python bin_packing_problem_generator.py --B=100 --n=2000 --classes=5 --seed=2042
      ```
-   - Code: 🔗 [bin_packing_problem_generator.py](./bin_packing_problem_generator.py)
+   - Code: 🔗 [bin_packing_problem_generator.py](./src/in_packing_problem_generator.py)
 
 2. **Augment LPs with Symmetry-Breaking Snippets**
    - Read a **base LP**, read all constraint snippet files from a directory, and **insert** each snippet **right before the `Binary` section**, producing one augmented LP per snippet.
