@@ -39,7 +39,7 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```bash
      python bin_packing_problem_generator.py --B=100 --n=2000 --classes=5 --seed=2042
      ```
-   - Code: 🔗 [bin_packing_problem_generator.py](./src/in_packing_problem_generator.py)
+   - Code: 🔗 [bin_packing_problem_generator.py](./src/bin_packing_problem_generator.py)
 
 2. **Augment LPs with Symmetry-Breaking Snippets**
    - Read a **base LP**, read all constraint snippet files from a directory, and **insert** each snippet **right before the `Binary` section**, producing one augmented LP per snippet.
