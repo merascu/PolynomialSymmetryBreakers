@@ -16,15 +16,21 @@ for lpfile in "$LP_DIR"/*.lp; do        # Iterate over all .lp files in the dire
   echo "Solving $lpfile"
 
   # Run Gurobi with parameters:
-  #   LogFile=outfile, NonConvex=2, Presolve=0, Symmetry=0, TimeLimit=600
-  # Write solution to solfile, then append it to outfile (so outfile contains log + solution)
+  # LogFile=outfile,
+  # NonConvex=2 -- Sets the strategy for handling non-convex quadratic objectives or non-convex
+  # quadratic constraints
+  # (see https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html).               #
+  # Presolve=0,
+  # Symmetry=0,
+  # WorkLimit=1800
+  # NonConvex=2: # Write solution to solfile, then append it to outfile (so outfile contains log + solution)
   gurobi_cl \
     LogFile="$outfile" \
     ResultFile="$solfile" \
     NonConvex=2 \
     Presolve=0 \
     Symmetry=0 \
-    TimeLimit=600 \
+    WorkLimit=1800 \
     "$lpfile"
 
   status=$?                             # Capture solver exit code
