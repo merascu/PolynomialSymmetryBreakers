@@ -9,7 +9,7 @@
 
 ## Introduction
 
-Symmetry in integer programming causes redundant search and is often handled with symmetry breaking constraints that remove as many equivalent solutions as possible. We propose an algebraic method which allows to generate a random family of polynomial inequalities which can be used as symmetry breakers. The method requires as input an arbitrary base polynomial and a group of permutations which is pecific to the integer program. The computations can be easily carried out in any major symbolic computation software. In order to test our approach, we describe a case study on near half-capacity 0-1 bin packing instances which exhibit substantial symmetries. We statically generate random quadratic breakers and add them to a baseline integer programming problem which we then solve with Gurobi. It turns out that simple symmetry breakers, especially combining few variables and permutations, most consistently reduce work time.
+Improve!!!!!!! Symmetry in integer programming causes redundant search and is often handled with symmetry breaking constraints that remove as many equivalent solutions as possible. We propose an algebraic method which allows to generate a random family of polynomial inequalities which can be used as symmetry breakers. The method requires as input an arbitrary base polynomial and a group of permutations which is pecific to the integer program. The computations can be easily carried out in any major symbolic computation software. In order to test our approach, we describe a case study on near half-capacity 0-1 bin packing instances which exhibit substantial symmetries. We statically generate random quadratic breakers and add them to a baseline integer programming problem which we then solve with Gurobi. It turns out that simple symmetry breakers, especially combining few variables and permutations, most consistently reduce work time.
 
 This repository accompanies the paper *Automatic Generation of Polynomial Symmetry Breaking Constraints* submitted to [ISSAC 2026](https://www.issac-conference.org/2026/). 
 
@@ -56,7 +56,7 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```bash
      ./run_all_lp_with_Gurobi.sh <lp_out_files>
      ```
-   - Script: 🔗 [run_all_lp_with_Gurobi.sh](./scripts/run_all_lp_with_Gurobi.sh)
+   - Code: 🔗 [run_all_lp_with_Gurobi.sh](./scripts/run_all_lp_with_Gurobi.sh)
 
 4. **Extract Solver Metrics to CSV**
    - Parse solver logs/outputs and extract: **file name**, **runtime**, **work units**, and **objective (if optimal)** into a CSV.
