@@ -50,8 +50,12 @@ Please ensure you have these dependencies installed and configured correctly bef
    - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py)
 
 3. **Batch Solve LPs with Gurobi**
-   - Solve every `*.lp` in a directory using `gurobi_cl`, writing a `*.out` log and appending the `*.sol` solution to it.
-   - Uses: `NonConvex=2`, `Presolve=0`, `Symmetry=0`, `WorkLimit=1800`.
+   - Solves with Gurobi every model saved in an `lp` file. Saves the results into `lp_out_files` directory.
+   - Parameters: `gurobi_cl` is run with the parameters `NonConvex=2`, `Presolve=0`, `Symmetry=0`, `WorkLimit=1800`.
+   - Run:
+     ```bash
+     ./run_all_lp_with_Gurobi.sh <lp_out_files>
+     ```
    - Script: 🔗 [run_all_lp_with_Gurobi.sh](./scripts/run_all_lp_with_Gurobi.sh)
 
 4. **Extract Solver Metrics to CSV**
