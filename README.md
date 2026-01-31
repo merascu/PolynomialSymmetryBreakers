@@ -63,10 +63,9 @@ Please ensure you have these dependencies installed and configured correctly bef
       - **`filename`**:
         Name of the parsed log file.
       - **`status`**  
-        Solver termination status extracted from the log.  
-        Currently detects:
-        - `"Optimal solution found"` if an optimal solution was proven.
-        - `"Time limit reached"` if the run stopped due to the time limit.        
+        Solver termination status:
+           - `"Optimal solution found"` if an optimal solution was proven.
+           - `"Time limit reached"` if the run stopped due to the time limit.        
       - **`objective`**  
         The value of the optimal solution value **only if** the log contains a line of the form:        
       - **`gap`**  
