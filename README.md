@@ -41,11 +41,11 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```
    - Code: 🔗 [bin_packing_problem_generator.py](./src/bin_packing_problem_generator.py)
 
-2. **Augment LPs with Symmetry-Breaking Snippets**
-   - Read a **base LP**, read all constraint snippet files from a directory, and **insert** each snippet **right before the `Binary` section**, producing one augmented LP per snippet.
+2. **Augment LPs with Symmetry-Breaking Constraints**
+   - Augments the bin packing base model (`base.lp`) with symmetry-breaking constraints and writes the resulting LP models to `prob_with_sbs/`.  Each file in `sbs/` contains a *family* of symmetry breakers that is inserted into the base model to produce a corresponding augmented LP file.
    - Run:
      ```bash
-     python gen_files_with_sbs.py base_lp_file="base.lp" sbs_dir="snippets/" gen_lp_files="out_lps/"
+     python gen_files_with_sbs.py base_lp_file="base.lp" sbs_dir="sbs/" gen_lp_files="prob_with_sbs/"
      ```
    - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py)
 
