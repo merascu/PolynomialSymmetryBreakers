@@ -28,6 +28,8 @@ This project relies on the following libraries and tools:
 
 - **Python (v3.9.6)**
 - **Gurobi (v13.0.0), Academic License**
+- **Emacs (v29.1 or better)**
+- **OCaml (v5.3.0 or better) and opam**
 
 Please ensure you have these dependencies installed and configured correctly before running the project.
 
@@ -85,7 +87,15 @@ Please ensure you have these dependencies installed and configured correctly bef
       python extract_to_csv.py in_path="path/to/dir_with_out_files" out_csv="results.csv"
       ```
    - Code: 🔗 [extract_to_csv.py](./src/extract_to_csv.py)
-5. **Johannes**
+5. **Generate Symmetry Breakers**
+   - Takes an instance of the bin packing problem and generates a suite of random symmetry breakers (10 for each combination of shape, number of variables, and number of permutations).
+       - Install the **re** library using opam: `opam install re` (needs to be done only once) 
+       - Extract the source code from the literate program format: either from the terminal with `emacs --batch -l org quadratic-breakers.org -f org-babel-tangle` or by opening the `quadratic-breakers.org` file and calling the `org-babel-tangle` function (as `M-x org-babel-tangle` or `C-c C-v C-t`).
+       - Compile the extracted source code with `ocamlbuild -package re breakers.native`
+       - Call the complied program as `./breakers.native LP-FILE` where `LP-FILE` is one of the randomly generated bin packing instances.
+   - **Warnings**
+       - Currently the number of bins is hardcoded as $n = 2000$. For smaller number of variables, generating breakers will lead to crashes.
+       - The program assumes that the object sizes are given as a comment at the start of the `LP-FILE`. Moreover, it assumes that the objects sizes are ordered ascendingly.
 
 ## License
 
