@@ -15,15 +15,25 @@ for lpfile in "$LP_DIR"/*.lp; do        # Iterate over all .lp files in the dire
 
   echo "Solving $lpfile"
 
-  # Run Gurobi with parameters:
-  # LogFile=outfile,
-  # NonConvex=2 -- Sets the strategy for handling non-convex quadratic objectives or non-convex
-  # quadratic constraints
-  # (see https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html).               #
-  # Presolve=0,
-  # Symmetry=0,
-  # WorkLimit=1800
-  # NonConvex=2: # Write solution to solfile, then append it to outfile (so outfile contains log + solution)
+  Table: Gurobi configurations used in our experiments
+
+#+-----------+----------+---------+--------------+------------+
+#| Parameter | Baseline | Default | Conservative | Aggressive |
+#+-----------+----------+---------+--------------+------------+
+#| Nonconvex |    2     |    2    |      2       |     2      |
+#| Presolve  |    0     |   -1    |     -1       |    -1      |
+#| Symmetry  |    0     |   -1    |      1       |     2      |
+#+-----------+----------+---------+--------------+------------+
+
+#   Run Gurobi with parameters:
+#   LogFile=outfile,
+#   NonConvex=2 -- Sets the strategy for handling non-convex quadratic objectives or non-convex
+#   quadratic constraints
+#   (see https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html).               #
+#   Presolve=0 (disabled),
+#   Symmetry=0,
+#   WorkLimit=1800
+#   NonConvex=2: # Write solution to solfile, then append it to outfile (so outfile contains log + solution)
   gurobi_cl \
     LogFile="$outfile" \
     ResultFile="$solfile" \
@@ -32,6 +42,37 @@ for lpfile in "$LP_DIR"/*.lp; do        # Iterate over all .lp files in the dire
     Symmetry=0 \
     WorkLimit=1800 \
     "$lpfile"
+
+# Presolve - default (-1)
+# Symmetry - default (A value of -1 corresponds to an automatic setting; Default settings are quite effective, so changing the value of this parameter rarely produces a significant benefit.)
+#gurobi_cl \
+#    LogFile="$outfile" \
+#    ResultFile="$solfile" \
+#    NonConvex=2 \
+#    WorkLimit=1800 \
+#    "$lpfile"
+
+# Presolve - default (-1)
+# Symmetry = 1 conservative
+#  gurobi_cl \
+#    LogFile="$outfile" \
+#    ResultFile="$solfile" \
+#    NonConvex=2 \
+#    Symmetry=1 \
+#    WorkLimit=1800 \
+#    "$lpfile"
+
+## Presolve - default (-1)
+## Symmetry = 2 aggresive
+#  gurobi_cl \
+#    LogFile="$outfile" \
+#    ResultFile="$solfile" \
+#    NonConvex=2 \
+#    Symmetry=2 \
+#    WorkLimit=1800 \
+#    "$lpfile"
+
+
 
   status=$?                             # Capture solver exit code
 
