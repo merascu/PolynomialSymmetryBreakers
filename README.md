@@ -9,7 +9,7 @@
 
 ## Introduction
 
-**Improve!!!!!!! **Symmetry in integer programming causes redundant search and is often handled with symmetry breaking constraints that remove as many equivalent solutions as possible. We propose an algebraic method which allows to generate a random family of polynomial inequalities which can be used as symmetry breakers. The method requires as input an arbitrary base polynomial and a group of permutations which is pecific to the integer program. The computations can be easily carried out in any major symbolic computation software. In order to test our approach, we describe a case study on near half-capacity 0-1 bin packing instances which exhibit substantial symmetries. We statically generate random quadratic breakers and add them to a baseline integer programming problem which we then solve with Gurobi. It turns out that simple symmetry breakers, especially combining few variables and permutations, most consistently reduce work time.
+Symmetry in integer programming causes redundant search and is often handled with symmetry breaking constraints that remove as many equivalent solutions as possible. We propose an algebraic method which allows to generate a random family of polynomial inequalities which can be used as symmetry breakers. The method requires as input an arbitrary base polynomial and a group of permutations which is pecific to the integer program. The computations can be easily carried out in any major symbolic computation software. In order to test our approach, we describe a case study on near half-capacity 0-1 bin packing instances which exhibit substantial symmetries. We statically generate random quadratic breakers and add them to a baseline integer programming problem which we then solve with Gurobi. It turns out that simple symmetry breakers, especially combining few variables and permutations, most consistently reduce work time.
 
 This repository accompanies the paper *Automatic Generation of Polynomial Symmetry Breaking Constraints* submitted to [ISSAC 2026](https://www.issac-conference.org/2026/). 
 
@@ -28,6 +28,8 @@ This project relies on the following libraries and tools:
 
 - **Python (v3.9.6)**
 - **Gurobi (v13.0.0), Academic License**
+- **Emacs (v29.1 or better)**
+- **OCaml (v5.3.0 or better) and opam**
 
 Please ensure you have these dependencies installed and configured correctly before running the project.
 
@@ -40,8 +42,33 @@ Please ensure you have these dependencies installed and configured correctly bef
      python bin_packing_problem_generator.py --B=100 --n=2000 --classes=5 --seed=2042
      ```
    - Code: 🔗 [bin_packing_problem_generator.py](./src/bin_packing_problem_generator.py)
+2. **Generate Symmetry Breakers**
+   - Takes an instance of the bin packing problem and generates a suite of random symmetry breakers (10 for each combination of shape, number of variables, and number of permutations).
+   
+   1. Install the **re** library using opam. This needs to be done only once.
+      ```bash
+      opam install re
+      ```
+   2. Extract the source code from the literate program format ([quadratic-breakers.org](./src/quadratic-breakers.org)): either from the terminal with
+      ```bash
+      emacs --batch -l org quadratic-breakers.org -f org-babel-tangle
+      ```
+      or by opening the ([quadratic-breakers.org](./src/quadratic-breakers.org)) file in Emacs and calling the `org-babel-tangle` function (as `M-x org-babel-tangle` or `C-c C-v C-t`).
 
-2. **Augment LPs with Symmetry-Breaking Constraints**
+   3. Compile the extracted source code with
+      ```bash
+      ocamlbuild -package re breakers.native
+      ```
+   4. Call the complied program as:
+      ```bash
+      ./breakers.native <LP-FILE>
+      ```
+      where `LP-FILE` is one of the randomly generated bin packing instances.
+   - **Warnings**
+       - Currently the number of bins is hardcoded as $n = 2000$. For smaller number of variables, generating breakers will lead to crashes.
+       - The program assumes that the object sizes are given as a comment at the start of the `LP-FILE`. Moreover, it assumes that the objects sizes are ordered ascendingly.
+
+4. **Augment LPs with Symmetry-Breaking Constraints**
    - Augments the bin packing base model (`base.lp`) with symmetry-breaking constraints and writes the resulting LP models to `prob_with_sbs/`.  Each file in `sbs/` contains a *family* of symmetry breakers that is inserted into the base model to produce a corresponding augmented LP file.
    - Run:
      ```bash
@@ -49,7 +76,7 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```
    - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py)
 
-3. **Batch Solve LPs with Gurobi**
+5. **Batch Solve LPs with Gurobi**
    - Solves with Gurobi every model saved in an `lp` file. Saves the results into `lp_out_files` directory.
    - Parameters: `gurobi_cl` is run with the parameters `NonConvex=2`, `Presolve=0`, `Symmetry=0`, `WorkLimit=1800`.
    - Run:
@@ -58,7 +85,7 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```
    - Code: 🔗 [run_all_lp_with_Gurobi.sh](./scripts/run_all_lp_with_Gurobi.sh)
 
-4. **Extract Solver Metrics to CSV**
+6. **Extract Solver Metrics to CSV**
    - Parses Gurobi one gurobi file at a time and extracts into a CSV file, by columns:
       - **`filename`**:
         Name of the parsed log file.
@@ -85,7 +112,7 @@ Please ensure you have these dependencies installed and configured correctly bef
       python extract_to_csv.py in_path="path/to/dir_with_out_files" out_csv="results.csv"
       ```
    - Code: 🔗 [extract_to_csv.py](./src/extract_to_csv.py)
-5. **Johannes**
+
 
 ## License
 
