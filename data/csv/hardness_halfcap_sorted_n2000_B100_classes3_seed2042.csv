@@ -1,4 +1,8 @@
 filename,status,objective,gap,work_units,runtime_seconds,initial_gap,simplex_iters,nodes
+hardness_halfcap_sorted_n2000_B100_classes3_seed2042_nonconvex2_presolve-1_symmetry1.out,,,11.1901%,8303.72,2172.36,33.3%,4005522,1
+hardness_halfcap_sorted_n2000_B100_classes3_seed2042_nonconvex2_presolve-1_symmetry2.out,,,11.1901%,8303.72,2172.55,33.3%,4005522,1
+hardness_halfcap_sorted_n2000_B100_classes3_seed2042_nonconvex2_presolve-1_symmetry-1.out,Optimal solution found,1.000000000000e+03,0.0000%,437.19,234.79,33.3%,4016155,1
+hardness_halfcap_sorted_n2000_B100_classes3_seed2042_nonconvex2_presolve0_symmetry0.out,Optimal solution found,1.000000000000e+03,0.0000%,810.93,416.44,33.3%,190748,1
 hardness_halfcap_sorted_n2000_B100_classes3_seed2042__thousand_vars_few_perms_only_ys__seed9577.out,Optimal solution found,1.000000000000e+03,0.0000%,297.23,154.44,1.58%,125677,1
 hardness_halfcap_sorted_n2000_B100_classes3_seed2042__few_vars_few_perms_pure_linear_x_and_y__seed5219.out,Optimal solution found,1.000000000000e+03,0.0000%,925.07,463.65,33.3%,176860,1
 hardness_halfcap_sorted_n2000_B100_classes3_seed2042__few_vars_many_perms_pure_linear_x_and_y__seed2319.out,Optimal solution found,1.000000000000e+03,0.0000%,204.46,110.60,32.9%,117350,1
