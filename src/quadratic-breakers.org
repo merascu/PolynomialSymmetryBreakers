@@ -1103,7 +1103,7 @@ We also include the main function in this code block. It simply
 executes every one of the experiments \(10\) times.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :noweb no-export
-<<generate-experiments(table=experiments-1000)>>
+<<generate-experiments(table=experiments-99)>>
 
 let main = List.iter (run ~prefix ~repeat:10) experiments
 #+END_SRC
@@ -1173,6 +1173,10 @@ As far as the concrete changes are concerned, we leave the "few"
 variables cases untouched and only lower the number of variables for
 the "many" and "numerous" variable cases.
 
+Since the maximum number of \(x\)'s being used is \(1\,000\) and the
+maximum number of \(y\)'s is \(800\), these templates will work for
+any \(n \geq 800\).
+
 
 #+NAME: experiments-1000
 | Vars     | Perms | Class               | Specification                      | Permutations | Transpositions | Exclude   |
@@ -1216,6 +1220,107 @@ the "many" and "numerous" variable cases.
 | numerous | few   | pure_linear_only_x  | Lin (X, 1000)                      |           50 | all_perms      | no_zero   |
 | numerous | few   | pure_linear_only_y  | Lin (Y, 800)                       |           50 | col_perms      | no_zero   |
 | numerous | few   | pure_linear_x_and_y | Sum [Lin (X, 1200); Lin (Y, 500)]  |           50 | all_perms      | no_zero   |
+
+
+
+** \(n = 700\)
+
+For \(n = 700\), we do again modify the number of variables per term
+as shown in the table below.
+
+As far as the concrete changes are concerned, we leave the "few" and
+"many" variables cases untouched and only lower the number of
+variables for the "numerous" variable case.
+
+
+#+NAME: experiments-700
+| Vars     | Perms | Class               | Specification                      | Permutations | Transpositions | Exclude   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| few      | few   | only_x              | Sq (X, 3)                          |           50 | all_perms      | no_zero   |
+| few      | few   | only_y              | Sq (Y, 3)                          |           50 | col_perms      | no_zero   |
+| few      | few   | mixed               | Quad (X, 3, Y, 3)                  |           50 | all_perms      | no_zero   |
+| few      | few   | separate            | Sum [Sq (X, 3); Sq (Y, 3)]         |           50 | all_perms      | no_zero   |
+| few      | few   | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]        |           50 | all_perms      | no_linear |
+| few      | few   | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]        |           50 | all_perms      | no_linear |
+| few      | few   | pure_linear_only_x  | Lin (X, 10)                        |           50 | all_perms      | no_zero   |
+| few      | few   | pure_linear_only_y  | Lin (Y, 10)                        |           50 | col_perms      | no_zero   |
+| few      | few   | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]       |           50 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| few      | many  | only_x              | Sq (X, 3)                          |          500 | all_perms      | no_zero   |
+| few      | many  | only_y              | Sq (Y, 3)                          |          500 | col_perms      | no_zero   |
+| few      | many  | mixed               | Quad (X, 3, Y, 3)                  |          500 | all_perms      | no_zero   |
+| few      | many  | separate            | Sum [Sq (X, 3); Sq (Y, 3)]         |          500 | all_perms      | no_zero   |
+| few      | many  | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]        |          500 | all_perms      | no_linear |
+| few      | many  | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]        |          500 | all_perms      | no_linear |
+| few      | many  | pure_linear_only_x  | Lin (X, 10)                        |          500 | all_perms      | no_zero   |
+| few      | many  | pure_linear_only_y  | Lin (Y, 10)                        |          500 | col_perms      | no_zero   |
+| few      | many  | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]       |          500 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| many     | few   | only_x              | Sq (X, 12)                         |           50 | all_perms      | no_zero   |
+| many     | few   | only_y              | Sq (Y, 12)                         |           50 | col_perms      | no_zero   |
+| many     | few   | mixed               | Quad (X, 12, Y, 12)                |           50 | all_perms      | no_zero   |
+| many     | few   | separate            | Sum [Sq (X, 10); Sq (Y, 10)]       |           50 | all_perms      | no_zero   |
+| many     | few   | linear_x            | Sum [Lin (X, 100); Sq (Y, 10)]     |           50 | all_perms      | no_linear |
+| many     | few   | linear_y            | Sum [Sq (X, 10); Lin (Y, 100)]     |           50 | all_perms      | no_linear |
+| many     | few   | pure_linear_only_x  | Lin (X, 500)                       |           50 | all_perms      | no_zero   |
+| many     | few   | pure_linear_only_y  | Lin (Y, 300)                       |           50 | col_perms      | no_zero   |
+| many     | few   | pure_linear_x_and_y | Sum [Lin (X, 300); Lin (Y, 100)]   |           50 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| numerous | few   | only_x              | Sq (X, 30)                         |           50 | all_perms      | no_zero   |
+| numerous | few   | only_y              | Sq (Y, 30)                         |           50 | col_perms      | no_zero   |
+| numerous | few   | mixed               | Quad (X, 30, Y, 30)                |           50 | all_perms      | no_zero   |
+| numerous | few   | separate            | Sum [Sq (X, 30); Sq (Y, 30)]       |           50 | all_perms      | no_zero   |
+| numerous | few   | linear_x            | Sum [Lin (X, 700); Sq (Y, 30)]     |           50 | all_perms      | no_linear |
+| numerous | few   | linear_y            | Sum [Sq (X, 30); Lin (Y, 500)]     |           50 | all_perms      | no_linear |
+| numerous | few   | pure_linear_only_x  | Lin (X, 700)                       |           50 | all_perms      | no_zero   |
+| numerous | few   | pure_linear_only_y  | Lin (Y, 500)                       |           50 | col_perms      | no_zero   |
+| numerous | few   | pure_linear_x_and_y | Sum [Lin (X, 1000); Lin (Y, 400)]  |           50 | all_perms      | no_zero   |
+
+
+
+** \(n = 99\)
+
+The smallest examples so far are \(n = 99\) and \(n = 100\). Here, we
+need to restrict the number of sampled variables significantly since
+there are only \(99\) many \(y\)'s and \(9\,801\) many \(x\)'s. In
+fact, we complete delete the "numerous" case and only keep the other
+cases. We also lower the number of sampled variables for the "many"
+case.
+
+
+#+NAME: experiments-99
+| Vars     | Perms | Class               | Specification                      | Permutations | Transpositions | Exclude   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| few      | few   | only_x              | Sq (X, 3)                          |           50 | all_perms      | no_zero   |
+| few      | few   | only_y              | Sq (Y, 3)                          |           50 | col_perms      | no_zero   |
+| few      | few   | mixed               | Quad (X, 3, Y, 3)                  |           50 | all_perms      | no_zero   |
+| few      | few   | separate            | Sum [Sq (X, 3); Sq (Y, 3)]         |           50 | all_perms      | no_zero   |
+| few      | few   | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]        |           50 | all_perms      | no_linear |
+| few      | few   | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]        |           50 | all_perms      | no_linear |
+| few      | few   | pure_linear_only_x  | Lin (X, 10)                        |           50 | all_perms      | no_zero   |
+| few      | few   | pure_linear_only_y  | Lin (Y, 10)                        |           50 | col_perms      | no_zero   |
+| few      | few   | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]       |           50 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| few      | many  | only_x              | Sq (X, 3)                          |          500 | all_perms      | no_zero   |
+| few      | many  | only_y              | Sq (Y, 3)                          |          500 | col_perms      | no_zero   |
+| few      | many  | mixed               | Quad (X, 3, Y, 3)                  |          500 | all_perms      | no_zero   |
+| few      | many  | separate            | Sum [Sq (X, 3); Sq (Y, 3)]         |          500 | all_perms      | no_zero   |
+| few      | many  | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]        |          500 | all_perms      | no_linear |
+| few      | many  | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]        |          500 | all_perms      | no_linear |
+| few      | many  | pure_linear_only_x  | Lin (X, 10)                        |          500 | all_perms      | no_zero   |
+| few      | many  | pure_linear_only_y  | Lin (Y, 10)                        |          500 | col_perms      | no_zero   |
+| few      | many  | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]       |          500 | all_perms      | no_zero   |
+|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
+| many     | few   | only_x              | Sq (X, 12)                         |           50 | all_perms      | no_zero   |
+| many     | few   | only_y              | Sq (Y, 12)                         |           50 | col_perms      | no_zero   |
+| many     | few   | mixed               | Quad (X, 12, Y, 12)                |           50 | all_perms      | no_zero   |
+| many     | few   | separate            | Sum [Sq (X, 10); Sq (Y, 10)]       |           50 | all_perms      | no_zero   |
+| many     | few   | linear_x            | Sum [Lin (X, 100); Sq (Y, 10)]     |           50 | all_perms      | no_linear |
+| many     | few   | linear_y            | Sum [Sq (X, 10); Lin (Y, 75)]      |           50 | all_perms      | no_linear |
+| many     | few   | pure_linear_only_x  | Lin (X, 500)                       |           50 | all_perms      | no_zero   |
+| many     | few   | pure_linear_only_y  | Lin (Y, 85)                        |           50 | col_perms      | no_zero   |
+| many     | few   | pure_linear_x_and_y | Sum [Lin (X, 300); Lin (Y, 65)]    |           50 | all_perms      | no_zero   |
+
 
 
 
