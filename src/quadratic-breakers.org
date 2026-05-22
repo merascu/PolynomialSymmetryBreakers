@@ -1,6 +1,6 @@
 #+TITLE: Generating Quadratic Symmetry Breakers for Bin Packing
 #+AUTHOR: Johannes Middeke and Mǎdǎlina Eraşcu
-#+DATE: January 2026
+#+DATE: Version 0.2 (May 2026)
 
 * Overview and Compilation
 
@@ -36,9 +36,130 @@ ocamlbuild -package re breakers.native
 #+END_SRC
 
 
-The generated binary ~breaker.native~ expects an ~.LP~ file as
-argument. It will read the list with the sizes of the objects from the
-comment on the second line.
+The generated binary ~breaker.native~ expects {{{LP}}} or {{{SMT2}}}
+files as argument. It will read the list with the sizes of the objects
+from the comment on the second line. See the [[#arg-parsing][argument parser]] for an
+overview over other recognised command line arguments and the section
+on [[#reading-sizes][reading the sizes list]] for an explanation of how the item sizes
+should be specified in the input files.
+
+
+* Changes [0/4]
+
+** TODO Determine Number of Variables in Breakers from Problem Size [0/3]
+
+If the problem has \(n\) bins, then there will be \(n\) bin variables
+\(y_1, \ldots, y_n\) and \(n^2\) selector variables \(x_{11}, \ldots,
+x_{1n}, \ldots, x_{n1}, \ldots, x_{nn}\). If \(n\) is too small, then
+the (currently) hard-coded number of variables which we select
+randomly from the pool of all variables can exceed the number of
+available variables. Hence, we will add an option for relative sizes
+where the linear polynomials will use \(\lceil p n \rceil\) bin
+variables or \(\lceil p n^2 \rceil\) selector variables for some \(p
+\in (0,1)\).
+
+For now, the exact value of \(p\) will be hard-coded for each
+template. We will also add a minimum size so that we do not end up
+with just single variables for the linear polynomials. Similarly, a
+maximum size might make sense.
+
+
+*** TODO Add Command Line Options
+
+We need a command line option parser. For now, it will accept a single
+option ~--relative~ (in addition to the LP or SMT2 file name).
+
+We will use {{{OCaml}}}'s built-in ~Arg~ module for now.
+
+
+*** TODO Add Relative Linear Polynomial Sizes
+
+Find suitable \(p\) for each template.
+
+
+** TODO Include all Fixed Size Tables and Pick Based on Input Size
+
+An alternative method to the relative size selection would be to have
+a collection of fixed size tables and pick one based on the number of
+variables in the input. (For example, one table could cover input
+sizes \(n \in [20, 30)\), another one could cover input sizes \(n \in
+[30, 50)\) etc.)
+
+
+
+** TODO More Efficient Generation of Breakers [0/2]
+
+Instead of generating breakers completely at random, they should take
+the polynomial \(h\) into account. In particular, if \(h \in \RR[x, y]
+\setminus \{0\}\) is given, let \(\vars h\) denote the *variables* of
+\(h\) which is defined as the set of variables which occur in
+\(h\). (That is, all variables \(x_{i,k}\) or \(y_k\) for which there
+exists a term \(a m\) in \(h\) such that \(a \in \RR \setminus \{0\}\)
+and \(m\) is a power product with \(x_{i,k} \mid m\) or \(y_k \mid
+m\).) We then only want to generate transpositions which move at least
+one \(z \in \vars h\).
+
+
+*** TODO Implement the Variables Function
+
+Implement an {{{OCaml}}} version of \(\vars\).
+
+It will also be convenient to have a "rows" function which returns all
+\(i\) such that \(x_{i,k} \in \vars h\) for some \(k\) and an
+analogous "columns" function which returns all \(k\) such that \(y_k
+\in \vars h\) or there exists some \(i\) with \(x_{i,k} \in \vars h\).
+
+
+*** TODO Adjust the Transposition Generation
+
+Make sure that transpositions take \(\vars h\) into account.
+
+That is, we will want to generate only permutations of the form ~Row
+(i, j)~ where \(i\) is such that \(x_{i,k}\) occurs in \(h\) or ~Col (k,
+j)~ where \(k\) is such that \(x_{i,k}\) or \(y_k\) occur in \(h\).
+
+Since the variables of \(h\) change as we keep applying
+transpositions, there should be a function which generates a single
+random (row or column) transposition of the kind described above which
+can then be applied immediately. The overall algorithm would be to
+compute the variables, generate a transposition, apply it to \(h\),
+replace \(h\) with the result, and then repeat this several
+times. Optionally, we could keep the original polynomial around to
+make sure that we never get back to it.
+
+
+
+** TODO Add SMT2 Output Format
+
+Seems to be just some dialect of LISP.
+
+Example: A problem contraint from one of {{{ME}}}'s problems:
+
+#+BEGIN_SRC lisp :tangle no :exports both :noweb no :results value :wrap example
+(assert (<= (+ (* 48 x_0_19)
+	       (* 48 x_1_19)
+	       (* 48 x_2_19)
+	       (* 49 x_3_19)
+	       (* 49 x_4_19) 
+	       (* 49 x_5_19) 
+	       (* 50 x_6_19) 
+	       (* 50 x_7_19) 
+	       (* 50 x_8_19) 
+	       (* 50 x_9_19) 
+	       (* 50 x_10_19) 
+	       (* 51 x_11_19) 
+	       (* 51 x_12_19) 
+	       (* 51 x_13_19) 
+	       (* 51 x_14_19) 
+	       (* 52 x_15_19) 
+	       (* 52 x_16_19) 
+	       (* 52 x_17_19) 
+	       (* 52 x_18_19) 
+	       (* 52 x_19_19)) 
+	    (* 100 y_19)))
+#+END_SRC
+
+
 
 
 
@@ -64,10 +185,15 @@ about arguments of different length while ~List.map2~ would raise an
 exception.
 
 The third function computes a list of size boundaries from a sorted
-list of sizes. This is important for generating the row permutations.
+list of sizes. This is important for generating the row
+permutations. Basically, it takes a list \(x = [x_1, \ldots, x_m]\) as
+input and reports the indices \(i\) where a list item differs from its
+successor (ie, \(x_i \neq x_{i+1}\). The resulting list will be sorted
+ascendingly and it will also include the extreme indices \(0\) and
+\(m\) (change from list to nothing).
 
 Finally, there is a function which generates (and sets) a new random
-seed. We return the generated seed for printing. (Notice that we
+seed. We return the generated seed for printing. (Notice that we only
 generate seeds between \(1\,000\) and \(9\,999\) simply because it
 looks nicer when we print them.)
 
@@ -103,13 +229,18 @@ end
 
 * Variables
 
-Let us start with the definition of variables. There are the
-\(x_{i,k}\) as well as the \(y_k\) where we use \(i\) for the row
-indices and \(k\) for the column indices. We add a pretty printer for
-variables; and we define an order which has \(x_{i,k} < y_\ell\) for
-all \(i,k,\ell\), \(y_k < y_\ell\) iff \(k < \ell\), and \(x_{i,k} <
-x_{j,\ell}\) if \((i,k)\) is less than \((j,\ell)\) in the
-lexicographic order.
+Let us start with the definition of variables. There are the selector
+variables \(x_{i,k}\) as well as the bin variables \(y_k\) where we
+use \(i\) for the row indices and \(k\) for the column indices. We add
+two pretty printers for variables: one for {{{LP}}} syntax and one for
+{{{SMT2}}} syntax (ie, S-expressions). The {{{SMT2}}} syntax has an
+additional parameter that is used for reducing the amount of
+parentheses. (On the single variable level these print the same, but
+the code in the other modules will look cleaner if the functions have
+different names.) Finally, we define an order which has \(x_{i,k} <
+y_\ell\) for all \(i,k,\ell\), \(y_k < y_\ell\) iff \(k < \ell\), and
+\(x_{i,k} < x_{j,\ell}\) if \((i,k)\) is less than \((j,\ell)\)
+lexicographically.
 
 We decided to put stuff into modules even though we are just tangling
 everything into a single file. This way, we already have some
@@ -117,7 +248,6 @@ structure just in case this becomes a larger project. It is also
 shorter to be able to write ~Var.compare~ instead of ~compare_variable~ or
 something. (Also, the example shows that I can reuse the same names
 for functions rather than having to differentiate them.)
-
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 module Var = struct
@@ -133,6 +263,9 @@ module Var = struct
   let show ff = function
     | X (i, k) -> Format.fprintf ff "x_%d_%d" i k
     | Y k -> Format.fprintf ff "y_%d" k
+
+  let sexp ?(in_product = false) = show
+
 
   let compare v w =
     match v, w with
@@ -157,13 +290,16 @@ tasks, we will need to draw random samples from an array of values. In
 the case of polynomials, we will use sampling without replacement
 while for the permutations we will use sampling with replacement. (We
 could also use sampling with replacement for the polynomials---but for
-now we stick with the method that was used in the {{{Python}}} code.)
+now we stick with the method that was used in the original
+{{{Python}}} code.)
 
 There are no functions in {{{OCaml}}}'s standard library for sampling
 from a list or an array. Hence, we need to write our own. For sampling
 with replacement this is easy. For sampling without replacement, we
 will shuffle the array using a version of the [[https://en.wikipedia.org/wiki/Fisher–Yates_shuffle][Fisher--Yates shuffle]]
-before we take a prefix of the array.
+before we take a prefix of the array. Note that the function shuffles
+the array in place---if we ever want to avoid changing the original
+array, then we would need to pass a copy to ~without_replacement~.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 module Sample = struct
@@ -261,10 +397,10 @@ end
 
 * Free Abelian Groups generated by Ordered Sets
 
-For polynomials, it makes sense to put a bit more thought into
-it. Assume that \(h\) is a polynomial and write it as a sum of its
-homogeneous components \(h = \sum_d h_d\) where \(h_d\) is a
-homogeneous polynomial of degree \(d\) for each \(d\). If we take a
+For polynomials, it makes sense to put a bit more thought into their
+implementation. Assume that \(h\) is a polynomial and write it as a
+sum of its homogeneous components \(h = \sum_d h_d\) where \(h_d\) is
+a homogeneous polynomial of degree \(d\) for each \(d\). If we take a
 permutation \(g\) and use it to permutate the variables in \(h\), then
 each homogeneous component is mapped to a homogeneous polynomial of
 the same degree. Similarly, when we form the difference \(h\circ g -
@@ -303,7 +439,8 @@ standard library method---as dissatisfying as it might be.
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 module type OrderedSet = sig
   include Set.OrderedType
-  val show  : Format.formatter -> t -> unit
+  val show : Format.formatter -> t -> unit
+  val sexp : ?in_product:bool -> Format.formatter -> t -> unit
 end
 #+END_SRC
 
@@ -378,6 +515,13 @@ in front of it. Note that if the leading coefficient is \(-1\), then
 we write it out in full since we know that that syntax works in
 {{{Gurobi}}} (while we do know where a single minus will also work).
 
+In addition to {{{LP}}} syntax, we also provide a pretty printer for
+{{{SMT2}}} syntax (which seems to use S-expressions similar to
+{{{Lisp}}}). Note that the corresponding pretty printer has an option
+~in_sum~ which determines whether the group element will be included in
+a larger sum. (This is the case when we print polynomials having both
+a linear and a quadratic component.)
+
 Next, we provide two mapping functions: One which maps over
 coefficients and one which maps over generators. Here, we need to be
 careful to make sure that the general assumptions about the data
@@ -418,6 +562,7 @@ module Abelian (S : OrderedSet) : sig
   val ( - ) : t -> t -> t
   val compare : t -> t -> int
   val show  : Format.formatter -> t -> unit
+  val sexp  : ?in_sum:bool -> Format.formatter -> t -> unit
   val map_gen : (generator -> generator) -> t -> t
   val map_coeff : (coefficient -> coefficient) -> t -> t
   val to_list : t -> term list
@@ -507,6 +652,24 @@ end = struct
        List.iter (show_term ~first:false ff) xs
 
 
+  let sexp_term ff (a, s) =
+    match a with
+      |  0 -> failwith "How can a coefficient be zero?"
+      |  1 -> Format.fprintf ff "%a" (S.sexp ~in_product:false) s
+      | -1 -> Format.fprintf ff "(- %a)" (S.sexp ~in_product:false) s 
+      |  a -> Format.fprintf ff "(* %d %a)" a (S.sexp ~in_product:true) s
+
+  let sexp ?(in_sum=false) ff = function
+    | [] -> Format.fprintf ff "0"
+    | [x] -> sexp_term ff x;
+    | x :: xs ->
+       if not in_sum
+       then Format.fprintf ff "(+ %a" sexp_term x
+       else sexp_term ff x;
+       List.iter (Format.fprintf ff " %a" sexp_term) xs;
+       if not in_sum then Format.fprintf ff ")"       
+  
+
   let map_coeff f x =
     List.map (fun (a, s) -> (f a, s)) x
     |> List.filter (fun (a, _) -> a <> 0)
@@ -555,7 +718,9 @@ variables) by pairs where the first entry is always less or equal to
 the second. (This convention ensures that we do not need to worry
 about the commutativity of products.) We compare monomials
 lexicographically. For the pretty printing, we tread the case that
-both factors are the same specially.
+both factors are the same specially. (At least for the {{{LP}}}
+syntax---I am not sure if the {{{SMT2}}} syntax includes ana analog of
+{{{Lisp}}}'s ~expt~ function.)
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 module QuadraticMonomial = struct
@@ -578,6 +743,11 @@ module QuadraticMonomial = struct
     then Format.fprintf ff "%a ^ 2" Var.show u
     else Format.fprintf ff "%a * %a" Var.show u Var.show v
 
+  let sexp ?(in_product=false) ff (u, v) =
+    let sexp_var = Var.sexp ~in_product:true in
+    if in_product
+    then Format.fprintf ff "%a %a" sexp_var u sexp_var v
+    else Format.fprintf ff "(* %a %a)" sexp_var u sexp_var v
 end
 
 module Quadratic = Abelian(QuadraticMonomial)
@@ -652,7 +822,19 @@ module Polynomial = struct
       then Linear.show ff linear
       else Format.fprintf ff "%a + [ %a ]"
              Linear.show linear
-             Quadratic.show quadratic     
+             Quadratic.show quadratic
+
+  let sexp ff {linear; quadratic} =
+    match Linear.is_zero linear, Quadratic.is_zero quadratic with
+      |  true,  true -> Format.fprintf ff "0"
+      | false,  true -> Linear.sexp ff linear
+      |  true, false -> Quadratic.sexp ff quadratic
+      | false, false -> begin
+          Format.fprintf ff "(+ ";
+          Linear.sexp ~in_sum:true ff linear;
+          Quadratic.sexp ~in_sum:true ff quadratic;
+          Format.fprintf ff ")"
+        end
 end
 #+END_SRC
 
@@ -781,6 +963,7 @@ that we will use this with non-random permutations eventually.)
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 module Experiment = struct
   let run
+        ?(sexp = false)  (* Use SMT2 syntax *)
         ?(exclude = Polynomial.is_zero)
         ?(prefix = "hardnessA_halfcap_sorted_n200_B100_seed242")
         ~transpositions
@@ -793,13 +976,21 @@ module Experiment = struct
       let s = Aux.seed () in
       let h = base () in
       let bs = Breakers.generate ~exclude ~permutations transpositions h in
-      let filename = Format.asprintf "%s__%s__seed%d.lp" prefix descr s in
+      let filename =
+        if sexp
+        then Format.asprintf "%s__%s__seed%d.smt2" prefix descr s 
+        else Format.asprintf "%s__%s__seed%d.lp" prefix descr s
+      in
       let out = open_out filename in
       let ff = Format.formatter_of_out_channel out in
       let index = ref 0 in
       let print h =
         incr index;
-        Format.fprintf ff "sb%02d: %a <= 0\n" !index Polynomial.show h
+        if sexp
+        then
+          Format.fprintf ff "(assert (<= %a 0)) ;; sb%02d\n"
+            Polynomial.sexp h !index 
+        else Format.fprintf ff "sb%02d: %a <= 0\n" !index Polynomial.show h
       in
       Seq.iter print bs;
       close_out out
@@ -813,11 +1004,14 @@ end
 
 
 * Read the Size List Directly From a File
+:PROPERTIES:
+:CUSTOM_ID: reading-sizes
+:END:
 
-I want to take the filename of an ~.LP~ file and read the size array
-from the file. {{{ME}}} seems to put it always as a comment in the
-second line. Here is an example for the first four lines from one of
-the ~.LP~ files.
+I want to take the filename of an {{{LP}}} file and read the item
+sizes array from the file. {{{ME}}} seems to put it always as a
+comment in the second line. Here is an example for the first four
+lines from one of the {{{LP}}} files.
 
 #+BEGIN_QUOTE
 \ Bin Packing MILP (LP format)
@@ -836,9 +1030,11 @@ ocamlbuild -package re breakers.native
 #+END_SRC
 
 
-For reading the sizes, we first search for the sizes array and extract
-all the numbers. After splitting the number string into individual
-numbers, we parse them into proper integers.
+For reading the item sizes, we first search for the item sizes array
+and extract all the numbers. After splitting the number string into
+individual numbers, we parse them into proper integers. This function
+assumes that the item size array is given in {{{Python}}} syntax as
+shown above.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 let size_list line =
@@ -854,8 +1050,8 @@ let size_list line =
 
 
 
-This function reads an ~.LP~ file with the assumption that the sizes
-will be called out on the second line.
+This function reads an {{{LP}}} file or an {{{SMT2}}} file with the
+assumption that the item sizes are in a comment on the second line.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 let get_sizes filename =
@@ -870,7 +1066,7 @@ let get_sizes filename =
 This is a poor man's clone of the {{{Shell}}} function of the same
 name. We use regular expressions. Note that the behaviour is different
 from the {{{Shell}}} function: if the string ends with a slash, then
-we return and empty string; and if the suffix is the entire string,
+we return an empty string; and if the suffix is the entire string,
 then we also return the empty string.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
@@ -885,64 +1081,106 @@ let basename ?(suffix="") str =
 #+END_SRC
 
 
-The following function find the ~.LP~ filename from the program
-arguments. More precisely, we simply return the first argument.
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let set_up () =
-  if Array.length Sys.argv = 1
-  then failwith "Need the filename of an .LP file."
-  else
-    let arg = Sys.argv.(1) in
-    Format.printf "Processing: %s\n%!" arg;
-    arg
-#+END_SRC
-
-
-
-
 
 
 
 * Setting Up the Variables and Permutations
 
-Here is the list of sizes for this particular instance of the
-bin-packing problems. (We have simply copy&pasted it from {{{ME}}}'s
-files.) We determine the parameters \(m\) and \(n\) directly from the
-sizes list.
+There have been many changes to this section. We now support running
+the program on multiple files. Thus, we define a configuration type
+for each file which contains the file name, the prefix (aka the base
+name), whether the output should use {{{SMT2}}} syntax (aka
+S-expressions), and the list of bin sizes. We provide functions for
+initializing a configuration from a file name (reading the sizes data
+from the file) and for pretty printing a configuration.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let filename = set_up ()
+type configuration = {
+    filename : string;
+    prefix : string;
+    sexp : bool;
+    sizes : int list;
+  }
 
-let prefix = basename ~suffix:".lp" filename
 
-let sizes = get_sizes filename
-  
-let m = List.length sizes and n = List.length sizes
+let configure ?(sexp=false) filename =
+  let prefix =
+    if sexp
+    then basename ~suffix:".smt2" filename
+    else basename ~suffix:".lp" filename
+  and sizes = get_sizes filename
+  in
+  {filename; prefix; sexp; sizes}
+
+
+let show_config {filename; prefix; sexp; sizes} =
+  Format.printf "Filename:            '%s'.\n" filename;
+  Format.printf "Prefix:              '%s'.\n" prefix;
+  Format.printf "SMT2 output:         %b.\n" sexp;
+  Format.printf "Number of variables: %d.\n%!" (List.length sizes)
 #+END_SRC
 
 
-Next, we create the variables and permutations. For the (row)
-permutations, we need to compute the size boundaries from the sizes
-list.
+The next data type contains all the specifications for one single
+instance of a bin packing problem. More precisely, we include the
+number of items \(m\), the number of bins \(n\), a list of size
+boundaries, and lists of variables. We keep two separate lists for the
+\(x_{ik}\) and the \(y_k\) as well as one combined list for all the
+variables. Again, we provide functions to initialize problem instances
+(using configurations as input) and for pretty printing. (The pretty
+printing output is meant to align with the one for the
+configurations.)
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let xs = Var.xs m n and ys = Var.ys n
+type bin_packing_problem = {
+    m : int;
+    n : int;
+    boundaries : int list;
+    xs : Var.t array;
+    ys : Var.t array;
+    vars : Var.t array
+  }
 
-let vars = Array.concat [xs; ys]
 
-let boundaries = Aux.size_boundaries sizes
+let problem config =
+  let m = List.length config.sizes and n = List.length config.sizes in
+  let xs = Var.xs m n and ys = Var.ys n in
+  let boundaries = Aux.size_boundaries config.sizes in
+  let vars = Array.concat [xs; ys]
+  in
+  {m; n; xs; ys; vars; boundaries}
 
-let () =
+
+let show_problem {m; n; boundaries} =
   let pp_sep ff () = Format.pp_print_string ff "; " in
   let pp_list = Format.(pp_print_list ~pp_sep pp_print_int) in  
-  Format.printf "Size boundaries: [%a].\n%!" pp_list boundaries
+  Format.printf "m:                   %d.\n%!" m;
+  Format.printf "n:                   %d.\n%!" n;
+  Format.printf "Size boundaries:     [%a].\n%!" pp_list boundaries
+#+END_SRC
 
-let row_perms = Perm.row_perms boundaries
 
-let col_perms = Perm.col_perms m
+Finally, we provide a data structure which captures the symmetry group
+of a given bin packing problem instance. More precisely, we include
+all the generators split into row transpositions, column
+transpositions, and a combined list for all transpositions. This time
+we only have an initialization but no pretty printing.
 
-let all_perms = Array.concat [col_perms; row_perms]
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+type symmetries = {
+    row_perms : Perm.t array;
+    col_perms : Perm.t array;
+    all_perms : Perm.t array
+  }
+
+
+let symmetries problem =
+  let row_perms = Perm.row_perms problem.boundaries
+  and col_perms = Perm.col_perms problem.m
+  in
+  let all_perms = Array.concat [col_perms; row_perms]
+  in
+  {row_perms; col_perms; all_perms}
 #+END_SRC
 
 
@@ -977,7 +1215,7 @@ goes for \(y\) and the other terms.
 
 
 
-** Generate Experiments from Specifications
+** Fixed Size Polynomial Specifications
 
 In order to simplify coding the experiments, we are going to define a
 dedicated data type. This data type will include a specificiation
@@ -992,18 +1230,24 @@ these two linear polynomials are generated independently. Thus, the
 name "square" is somewhat misleading.)
 
 We add a function that turns a specificiation into an actual
-polynomial by calling the corresponding random polynomial functions.
+polynomial by calling the corresponding random polynomial
+functions. The first version of the function 
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 type var = X | Y
 
-type spec =
+type fixed_spec =
   | Lin of (var * int)
   | Sq of (var * int)
   | Quad of (var * int * var * int)
-  | Sum of spec list
+  | Sum of fixed_spec list
 
-let rec of_spec = function
+let fixed_lin var n = Lin (var, n)
+and fixed_sq var n = Sq (var, n)
+and fixed_quad var1 n1 var2 n2 = Quad (var1, n1, var2, n2)
+and fixed_sum list = Sum list
+
+let rec of_fixed_spec ({xs; ys; m; n} as bins) = function
   | Lin (X, n) -> random_linear ~vars:xs ~len:n
   | Lin (Y, n) -> random_linear ~vars:ys ~len:n
   | Sq (X, n) -> random_quadratic ~vars1:xs ~len1:n ~vars2:xs ~len2:n
@@ -1013,7 +1257,111 @@ let rec of_spec = function
   | Quad (Y, m, X, n) -> random_quadratic ~vars1:ys ~len1:m ~vars2:xs ~len2:n
   | Quad (Y, m, Y, n) -> random_quadratic ~vars1:ys ~len1:m ~vars2:ys ~len2:n
   | Sum sps ->
-     List.map of_spec sps |> List.fold_left Polynomial.add Polynomial.zero
+     List.map (of_fixed_spec bins) sps
+     |> List.fold_left Polynomial.add Polynomial.zero
+#+END_SRC
+
+
+
+
+** COMMENT Relative Polynomial Specifications
+
+For relative breaker sizes, we introduce a new specification type
+where the single integer values are replaced by a relative size type
+with a minimum value \(u \in \NN\), a maximum value \(v \in \NN\), and
+a scaling factor \(p \in (0,1)\). Given the number \(n\) of available
+variables, we will then randomly choose
+\begin{equation*}
+  \max \{\min \{ u, \lceil p n \rceil \}, v\}
+\end{equation*}
+many variables.
+
+In order to make the implementation work more smoothly, we also
+redefine the generators for random linear and quadratic polynomials so
+that they apply the relative sizes.
+
+Note that in extreme cases we might still request too many
+variables. (For example, if the minimum \(v\) is larger than the
+number of variables \(n\).) In that case, the program will fail with
+an exception.
+
+#+BEGIN_SRC ocaml :tangle no :eval never
+type relative_size = {
+    minimum : int;
+    factor : float;
+    maximum : int }
+
+let rel_size minimum factor maximum = {minimum; factor; maximum}
+
+type relative_spec =
+  | RelLin of (var * relative_size)
+  | RelSq of (var * relative_size)
+  | RelQuad of (var * relative_size * var * relative_size)
+  | RelSum of relative_spec list
+
+let rel_lin var u p v = RelLin (var, rel_size u p v)
+and rel_sq var u p v = RelSq (var, rel_size u p v)
+and rel_quad var1 u1 p1 v1 var2 u2 p2 v2 =
+  RelQuad (var1, rel_size u1 p1 v1,
+           var2, rel_size u2 p2 v2)
+and rel_sum specs = RelSum specs
+
+let relative {minimum = u; factor = p; maximum = v} n =
+  let pn = ceil (p *. float n) |> int_of_float in
+  let r = max (min u pn) v in
+  if r > n
+  then failwith "Too many variables requested."
+  else r
+
+let relative_random_linear ~vars ~spec =
+  let len = relative spec (Array.length vars) in
+  random_linear ~vars ~len
+
+let relative_random_quadratic ~vars1 ~spec1 ~vars2 ~spec2 =
+  let len1 = relative spec1 (Array.length vars1) 
+  and len2 = relative spec2 (Array.length vars2)
+  in
+  random_quadratic ~vars1 ~len1 ~vars2 ~len2
+
+let rec of_relative_spec spec =
+  match spec with 
+    | RelLin (X, p) -> relative_random_linear ~vars:xs ~spec:p
+    | RelLin (Y, p) -> relative_random_linear ~vars:ys ~spec:p
+    | RelSq (X, p) ->
+       relative_random_quadratic ~vars1:xs ~spec1:p ~vars2:xs ~spec2:p
+    | RelSq (Y, p) ->
+       relative_random_quadratic ~vars1:ys ~spec1:p ~vars2:ys ~spec2:p
+    | RelQuad (X, p, X, q) ->
+       relative_random_quadratic ~vars1:xs ~spec1:p ~vars2:xs ~spec2:q
+    | RelQuad (X, p, Y, q) ->
+       relative_random_quadratic ~vars1:xs ~spec1:p ~vars2:ys ~spec2:q
+    | RelQuad (Y, p, X, q) ->
+       relative_random_quadratic ~vars1:ys ~spec1:p ~vars2:xs ~spec2:q
+    | RelQuad (Y, p, Y, q) ->
+       relative_random_quadratic ~vars1:ys ~spec1:p ~vars2:ys ~spec2:q
+    | RelSum sps ->
+       List.map of_relative_spec sps
+       |> List.fold_left Polynomial.add Polynomial.zero
+#+END_SRC
+
+
+
+** Experiment Specifications
+
+In order to treat both fixed and relative polynomial specification
+cases with the same code, we combine them into a common type.
+
+#+BEGIN_SRC ocaml :tangle no :eval never
+type spec = Fixed of fixed_spec | Relative of relative_spec
+
+let of_spec = function
+  | Fixed spec -> of_fixed_spec spec
+  | Relative spec -> of_relative_spec spec
+#+END_SRC
+
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
+let of_spec = of_fixed_spec
 #+END_SRC
 
 
@@ -1029,7 +1377,6 @@ An experiment specification consists of
   and
 + a specificiation for the base polynomial.
 
-
 We provide abbreviations for the two most common exclusion
 criteria. Moreover, we provide a function which allows to run a
 specificiation directly.
@@ -1039,17 +1386,30 @@ type experiment = {
     permutations : int;
     exclude : Polynomial.t -> bool;
     descr : string;
-    transpositions : Perm.t array;
-    base : spec   
+    transpositions : symmetries -> Perm.t array;
+    base : fixed_spec   
   }
 
 let no_linear q = Polynomial.(is_zero q || is_linear q)
 and no_zero q = Polynomial.is_zero q
 
-let run ~prefix ~repeat {permutations; descr; transpositions; base} =
-  let base_gen () = of_spec base in
-  Experiment.run ~prefix ~transpositions ~permutations ~descr ~repeat base_gen
+let row_perms {row_perms} = row_perms
+and col_perms {col_perms} = col_perms
+let all_perms {all_perms} = all_perms
+
+
+let run ~sexp ~prefix ~repeat ~problem ~symmetries
+      {permutations; descr; transpositions; base} =
+  let base_gen () = of_spec problem base in
+  Experiment.run
+    ~sexp ~prefix ~permutations ~descr ~repeat
+    ~transpositions:(transpositions symmetries)
+    base_gen
 #+END_SRC
+
+
+
+
 
 
 We will generate the actual code for the experiments from the tables
@@ -1067,17 +1427,31 @@ sixe columns:
 + Transpositions :: which kind of transpositions to use.
 
 
+We will distinguish between fixed and relative sizes in the table by
+using the following abbreviation: For fixed size specifications we
+have single integers ~n~ which we do not need to process any further.
+However, for relative size specifications we have terms of the form
+~u/p/v~ instead where \(u, v\) are integers and \(p\) is a float. We
+will need to translate those into a relative size function
+call. Moreover, we need to replace all the fixed sized constructors
+with their relative size counterparts.
+
 The tables are read by the {{{ELisp}}} code below and automatically
 translated into {{{OCaml}}} syntax when the source code is tangled. It
-creates a list called ~experiments~ which contains all the experiments
-specified in the given table. (Currently, the table has to specified
-by hand in this {{{Org}}} file.) Note that the ~Vars~, ~Perms~, and ~Class~
-columns are combined into a single description string.
+creates two list which contains all the fixed size and relative size
+experiments specified in the given tables. (Currently, which tables
+are used has to specified by hand by modifying this {{{Org}}} file.)
+Note that the ~Vars~, ~Perms~, and ~Class~ columns are combined into a
+single description string.
+
+
 
 #+NAME: generate-experiments
-#+HEADER: :var table=experiments-2000 :colnames yes
+#+HEADER: :colnames yes
+#+HEADER: :var table=experiments-2000 
+#+HEADER: :var name="experiments_2000"
 #+BEGIN_SRC emacs-lisp :tangle no :exports both :noweb no :results value :wrap example
-(let ((experiments 
+(let ((fixed-experiments 
        (cl-loop for (vars perms class spec num-perms transps excl) in table
 		for descr = (format "descr = \"%s_vars_%s_perms_%s\""
 				    vars perms class)
@@ -1087,13 +1461,123 @@ columns are combined into a single description string.
 		for exclude = (format "exclude = %s" excl)
 		for experiment = (format "{%s; %s; %s; %s; %s}"
 					 permutations descr transpositions
-					 base exclude)
+					 base exclude)		
 		collect experiment)))
-  (concat "let experiments = ["
-	  (string-join experiments "; ")
+  (concat (format "let %s = [" name)
+	  (string-join fixed-experiments "; ")
 	  "]"))
 #+END_SRC
 
+
+
+
+
+#+NAME: generate-experiments-alternative
+#+HEADER: :colnames yes
+#+HEADER: :var fixed-table=experiments-2000 
+#+HEADER: :var relative-table=experiments-relative 
+#+BEGIN_SRC emacs-lisp :tangle no :exports both :noweb no :results value :wrap example
+(let ((fixed-experiments 
+       (cl-loop for (vars perms class spec num-perms transps excl) in fixed-table
+		for descr = (format "descr = \"%s_vars_%s_perms_%s\""
+				    vars perms class)
+		for base = (format "base = %s" spec)
+		for permutations = (format "permutations = %s" num-perms)
+		for transpositions = (format "transpositions = %s" transps)
+		for exclude = (format "exclude = %s" excl)
+		for experiment = (format "{%s; %s; %s; %s; %s}"
+					 permutations descr transpositions
+					 base exclude)		
+		collect experiment))
+      (relative-experiments 
+       (cl-loop for (vars perms class spec num-perms transps excl) in relative-table
+		for descr = (format "descr = \"%s_vars_%s_perms_%s\""
+				    vars perms class)
+		for rel-sizes = (replace-regexp-in-string
+				"\\([0-9]+\\)/\\([.0-9]+\\)/\\([0-9]+\\)"
+				"(relative_size \\1 \\2 \\3)"
+				spec)
+		for rel-spec = (replace-regexp-in-string
+				"\\(Lin\\|Sq\\|Quad\\|Sum\\)"
+				"Rel\\1"
+				rel-sizes)
+		for base = (format "base = %s" rel-spec)
+		for permutations = (format "permutations = %s" num-perms)
+		for transpositions = (format "transpositions = %s" transps)
+		for exclude = (format "exclude = %s" excl)
+		for experiment = (format "{%s; %s; %s; %s; %s}"
+					 permutations descr transpositions
+					 base exclude)		
+		collect experiment)))
+  (concat
+   "let fixed_experiments = ["
+   (string-join fixed-experiments "; ")
+   "]\n"
+   "let relative_experiments = ["
+   (string-join relative-experiments "; ")
+   "]"))
+#+END_SRC
+
+#+RESULTS: generate-experiments
+#+begin_example
+let fixed_experiments = [{permutations = 50; descr = "few_vars_few_perms_only_x"; transpositions = all_perms; base = Sq (X, 3); exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_only_y"; transpositions = col_perms; base = Sq (Y, 3); exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_mixed"; transpositions = all_perms; base = Quad (X, 3, Y, 3); exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_separate"; transpositions = all_perms; base = Sum [Sq (X, 3); Sq (Y, 3)]; exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_linear_x"; transpositions = all_perms; base = Sum [Lin (X, 7); Sq (Y, 3)]; exclude = no_linear}; {permutations = 50; descr = "few_vars_few_perms_linear_y"; transpositions = all_perms; base = Sum [Sq (X, 3); Lin (Y, 7)]; exclude = no_linear}; {permutations = 50; descr = "few_vars_few_perms_pure_linear_only_x"; transpositions = all_perms; base = Lin (X, 10); exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_pure_linear_only_y"; transpositions = col_perms; base = Lin (Y, 10); exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_pure_linear_x_and_y"; transpositions = all_perms; base = Sum [Lin (X, 5); Lin (Y, 5)]; exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_only_x"; transpositions = all_perms; base = Sq (X, 3); exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_only_y"; transpositions = col_perms; base = Sq (Y, 3); exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_mixed"; transpositions = all_perms; base = Quad (X, 3, Y, 3); exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_separate"; transpositions = all_perms; base = Sum [Sq (X, 3); Sq (Y, 3)]; exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_linear_x"; transpositions = all_perms; base = Sum [Lin (X, 7); Sq (Y, 3)]; exclude = no_linear}; {permutations = 500; descr = "few_vars_many_perms_linear_y"; transpositions = all_perms; base = Sum [Sq (X, 3); Lin (Y, 7)]; exclude = no_linear}; {permutations = 500; descr = "few_vars_many_perms_pure_linear_only_x"; transpositions = all_perms; base = Lin (X, 10); exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_pure_linear_only_y"; transpositions = col_perms; base = Lin (Y, 10); exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_pure_linear_x_and_y"; transpositions = all_perms; base = Sum [Lin (X, 5); Lin (Y, 5)]; exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_only_x"; transpositions = all_perms; base = Sq (X, 25); exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_only_y"; transpositions = col_perms; base = Sq (Y, 25); exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_mixed"; transpositions = all_perms; base = Quad (X, 25, Y, 25); exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_separate"; transpositions = all_perms; base = Sum [Sq (X, 20); Sq (Y, 20)]; exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_linear_x"; transpositions = all_perms; base = Sum [Lin (X, 70); Sq (Y, 20)]; exclude = no_linear}; {permutations = 50; descr = "many_vars_few_perms_linear_y"; transpositions = all_perms; base = Sum [Sq (X, 20); Lin (Y, 70)]; exclude = no_linear}; {permutations = 50; descr = "many_vars_few_perms_pure_linear_only_x"; transpositions = all_perms; base = Lin (X, 1000); exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_pure_linear_only_y"; transpositions = col_perms; base = Lin (Y, 1000); exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_pure_linear_x_and_y"; transpositions = all_perms; base = Sum [Lin (X, 750); Lin (Y, 250)]; exclude = no_zero}; {permutations = 50; descr = "numerous_vars_few_perms_only_x"; transpositions = all_perms; base = Sq (X, 64); exclude = no_zero}; {permutations = 50; descr = "numerous_vars_few_perms_only_y"; transpositions = col_perms; base = Sq (Y, 64); exclude = no_zero}; {permutations = 50; descr = "numerous_vars_few_perms_mixed"; transpositions = all_perms; base = Quad (X, 64, Y, 64); exclude = no_zero}; {permutations = 50; descr = "numerous_vars_few_perms_separate"; transpositions = all_perms; base = Sum [Sq (X, 64); Sq (Y, 64)]; exclude = no_zero}; {permutations = 50; descr = "numerous_vars_few_perms_linear_x"; transpositions = all_perms; base = Sum [Lin (X, 2500); Sq (Y, 50)]; exclude = no_linear}; {permutations = 50; descr = "numerous_vars_few_perms_linear_y"; transpositions = all_perms; base = Sum [Sq (X, 50); Lin (Y, 2000)]; exclude = no_linear}; {permutations = 50; descr = "numerous_vars_few_perms_pure_linear_only_x"; transpositions = all_perms; base = Lin (X, 4000); exclude = no_zero}; {permutations = 50; descr = "numerous_vars_few_perms_pure_linear_only_y"; transpositions = col_perms; base = Lin (Y, 1500); exclude = no_zero}; {permutations = 50; descr = "numerous_vars_few_perms_pure_linear_x_and_y"; transpositions = all_perms; base = Sum [Lin (X, 3000); Lin (Y, 1000)]; exclude = no_zero}]
+let relative_experiments = [{permutations = 50; descr = "few_vars_few_perms_only_x"; transpositions = all_perms; base = RelSq (X, (relative_size 3 0.0 3)); exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_only_y"; transpositions = col_perms; base = RelSq (Y, (relative_size 3 0.0 3)); exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_mixed"; transpositions = all_perms; base = RelQuad (X, (relative_size 3 0.0 3), Y, (relative_size 3 0.0 3)); exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_separate"; transpositions = all_perms; base = RelSum [RelSq (X, (relative_size 3 0.0 3)); RelSq (Y, (relative_size 3 0.0 3))]; exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_linear_x"; transpositions = all_perms; base = RelSum [RelLin (X, (relative_size 7 0.0 7)); RelSq (Y, (relative_size 3 0.0 3))]; exclude = no_linear}; {permutations = 50; descr = "few_vars_few_perms_linear_y"; transpositions = all_perms; base = RelSum [RelSq (X, (relative_size 3 0.0 3)); RelLin (Y, (relative_size 7 0.0 7))]; exclude = no_linear}; {permutations = 50; descr = "few_vars_few_perms_pure_linear_only_x"; transpositions = all_perms; base = RelLin (X, (relative_size 10 0.0 10)); exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_pure_linear_only_y"; transpositions = col_perms; base = RelLin (Y, (relative_size 10 0.0 10)); exclude = no_zero}; {permutations = 50; descr = "few_vars_few_perms_pure_linear_x_and_y"; transpositions = all_perms; base = RelSum [RelLin (X, (relative_size 5 0.0 5)); RelLin (Y, (relative_size 5 0.0 5))]; exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_only_x"; transpositions = all_perms; base = RelSq (X, (relative_size 3 0.0 3)); exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_only_y"; transpositions = col_perms; base = RelSq (Y, (relative_size 3 0.0 3)); exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_mixed"; transpositions = all_perms; base = RelQuad (X, (relative_size 3 0.0 3), Y, (relative_size 3 0.0 3)); exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_separate"; transpositions = all_perms; base = RelSum [RelSq (X, (relative_size 3 0.0 3)); RelSq (Y, (relative_size 3 0.0 3))]; exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_linear_x"; transpositions = all_perms; base = RelSum [RelLin (X, (relative_size 7 0.0 7)); RelSq (Y, (relative_size 3 0.0 3))]; exclude = no_linear}; {permutations = 500; descr = "few_vars_many_perms_linear_y"; transpositions = all_perms; base = RelSum [RelSq (X, (relative_size 3 0.0 3)); RelLin (Y, (relative_size 7 0.0 7))]; exclude = no_linear}; {permutations = 500; descr = "few_vars_many_perms_pure_linear_only_x"; transpositions = all_perms; base = RelLin (X, (relative_size 10 0.0 10)); exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_pure_linear_only_y"; transpositions = col_perms; base = RelLin (Y, (relative_size 10 0.0 10)); exclude = no_zero}; {permutations = 500; descr = "few_vars_many_perms_pure_linear_x_and_y"; transpositions = all_perms; base = RelSum [RelLin (X, (relative_size 5 0.0 5)); RelLin (Y, (relative_size 5 0.0 5))]; exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_only_x"; transpositions = all_perms; base = RelSq (X, (relative_size 12 0.0 12)); exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_only_y"; transpositions = col_perms; base = RelSq (Y, (relative_size 12 0.0 12)); exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_mixed"; transpositions = all_perms; base = RelQuad (X, (relative_size 12 0.0 12), Y, (relative_size 12 0.0 12)); exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_separate"; transpositions = all_perms; base = RelSum [RelSq (X, (relative_size 10 0.0 10)); RelSq (Y, (relative_size 10 0.0 10))]; exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_linear_x"; transpositions = all_perms; base = RelSum [RelLin (X, (relative_size 100 0.0 100)); RelSq (Y, (relative_size 10 0.0 10))]; exclude = no_linear}; {permutations = 50; descr = "many_vars_few_perms_linear_y"; transpositions = all_perms; base = RelSum [RelSq (X, (relative_size 10 0.0 10)); RelLin (Y, (relative_size 75 0.0 75))]; exclude = no_linear}; {permutations = 50; descr = "many_vars_few_perms_pure_linear_only_x"; transpositions = all_perms; base = RelLin (X, (relative_size 500 0.0 500)); exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_pure_linear_only_y"; transpositions = col_perms; base = RelLin (Y, (relative_size 85 0.0 85)); exclude = no_zero}; {permutations = 50; descr = "many_vars_few_perms_pure_linear_x_and_y"; transpositions = all_perms; base = RelSum [RelLin (X, (relative_size 300 0.0 300)); RelLin (Y, (relative_size 65 0.0 65))]; exclude = no_zero}]
+#+end_example
+
+
+
+
+** Argument Parser
+:PROPERTIES:
+:CUSTOM_ID: arg-parsing
+:END:
+
+
+We are using the ~Arg~ module from {{{OCaml}}}'s standard library for
+command line parsing. At the moment the following options are
+recognised:
+
++ Use ~--smt2~ to generate {{{SMT2}}} syntax rather than {{{LP}}} syntax
+  (cancels a previous ~--lp~).
++ Use ~--lp~ to generate {{{LP}}} syntax rather than {{{SMT2}}} syntax
+  (cancels a previous ~--smt2~).
++ Use ~--repetitions INT~ in order to configure the number of breaker
+  files which are generated for every template. (If this is specified
+  multiple times, then only the last number is used.)
++ Every other argument will be interpreted as the name of an {{{LP}}}
+  or {{{SMT2}}} file.
+
+
+
+#+BEGIN_SRC ocaml :tangle breakers.ml :noweb no-export :eval never
+let usage_msg = "Generate random symmetry breakers for given LP or SMT2 files."
+
+let file_names = ref []
+and flag_smt2_syntax = ref false
+and repetitions = ref 10
+
+let add_filename file = file_names := file :: !file_names
+
+let speclist = [
+    "--repetitions", Arg.Set_int repetitions,
+    "Number of generated breaker files per template.";
+    "--smt2", Arg.Set flag_smt2_syntax, "Generate breakers in SMT2 syntax.";
+    "--lp", Arg.Clear flag_smt2_syntax, "Generate breakers in LP syntax."
+  ]
+
+let fail_no_files () =
+  Arg.usage speclist usage_msg;
+  exit 1
+
+let parse_arguments =
+  Arg.parse speclist add_filename usage_msg
+#+END_SRC
+
+
+
+
+
+** TODO Main Function
 
 The following source code block includes the reference to the
 {{{ELisp}}} code in {{{Noweb}}} syntax. It will be replaced by the
@@ -1103,10 +1587,35 @@ We also include the main function in this code block. It simply
 executes every one of the experiments \(10\) times.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :noweb no-export
-<<generate-experiments(table=experiments-99)>>
+<<generate-experiments(name="experiments_20", table=experiments-20)>>
+<<generate-experiments(name="experiments_99", table=experiments-99)>>
+<<generate-experiments(name="experiments_700", table=experiments-700)>>
+<<generate-experiments(name="experiments_1000", table=experiments-1000)>>
+<<generate-experiments(name="experiments_2000", table=experiments-2000)>>
 
-let main = List.iter (run ~prefix ~repeat:10) experiments
+let run filename =
+  let sexp = !flag_smt2_syntax and repeat = !repetitions in
+  let conf = configure ~sexp filename in
+  let problem = problem conf in
+  let symmetries = symmetries problem in
+  show_config conf;
+  show_problem problem;
+  List.iter (run ~sexp ~problem ~symmetries ~prefix:conf.prefix ~repeat)
+    (if problem.n < 20 then failwith "Two few variables"
+     else if problem.n < 99 then experiments_20 
+     else if problem.n < 700 then experiments_99 
+     else if problem.n < 1000 then experiments_700
+     else if problem.n < 2000 then experiments_1000
+     else experiments_2000)
+
+
+
+let main =
+  match !file_names with
+    | [] -> fail_no_files ()
+    | files -> List.iter run files
 #+END_SRC
+
 
 
 
@@ -1289,46 +1798,195 @@ case.
 
 
 #+NAME: experiments-99
-| Vars     | Perms | Class               | Specification                      | Permutations | Transpositions | Exclude   |
-|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
-| few      | few   | only_x              | Sq (X, 3)                          |           50 | all_perms      | no_zero   |
-| few      | few   | only_y              | Sq (Y, 3)                          |           50 | col_perms      | no_zero   |
-| few      | few   | mixed               | Quad (X, 3, Y, 3)                  |           50 | all_perms      | no_zero   |
-| few      | few   | separate            | Sum [Sq (X, 3); Sq (Y, 3)]         |           50 | all_perms      | no_zero   |
-| few      | few   | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]        |           50 | all_perms      | no_linear |
-| few      | few   | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]        |           50 | all_perms      | no_linear |
-| few      | few   | pure_linear_only_x  | Lin (X, 10)                        |           50 | all_perms      | no_zero   |
-| few      | few   | pure_linear_only_y  | Lin (Y, 10)                        |           50 | col_perms      | no_zero   |
-| few      | few   | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]       |           50 | all_perms      | no_zero   |
-|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
-| few      | many  | only_x              | Sq (X, 3)                          |          500 | all_perms      | no_zero   |
-| few      | many  | only_y              | Sq (Y, 3)                          |          500 | col_perms      | no_zero   |
-| few      | many  | mixed               | Quad (X, 3, Y, 3)                  |          500 | all_perms      | no_zero   |
-| few      | many  | separate            | Sum [Sq (X, 3); Sq (Y, 3)]         |          500 | all_perms      | no_zero   |
-| few      | many  | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]        |          500 | all_perms      | no_linear |
-| few      | many  | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]        |          500 | all_perms      | no_linear |
-| few      | many  | pure_linear_only_x  | Lin (X, 10)                        |          500 | all_perms      | no_zero   |
-| few      | many  | pure_linear_only_y  | Lin (Y, 10)                        |          500 | col_perms      | no_zero   |
-| few      | many  | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]       |          500 | all_perms      | no_zero   |
-|----------+-------+---------------------+------------------------------------+--------------+----------------+-----------|
-| many     | few   | only_x              | Sq (X, 12)                         |           50 | all_perms      | no_zero   |
-| many     | few   | only_y              | Sq (Y, 12)                         |           50 | col_perms      | no_zero   |
-| many     | few   | mixed               | Quad (X, 12, Y, 12)                |           50 | all_perms      | no_zero   |
-| many     | few   | separate            | Sum [Sq (X, 10); Sq (Y, 10)]       |           50 | all_perms      | no_zero   |
-| many     | few   | linear_x            | Sum [Lin (X, 100); Sq (Y, 10)]     |           50 | all_perms      | no_linear |
-| many     | few   | linear_y            | Sum [Sq (X, 10); Lin (Y, 75)]      |           50 | all_perms      | no_linear |
-| many     | few   | pure_linear_only_x  | Lin (X, 500)                       |           50 | all_perms      | no_zero   |
-| many     | few   | pure_linear_only_y  | Lin (Y, 85)                        |           50 | col_perms      | no_zero   |
-| many     | few   | pure_linear_x_and_y | Sum [Lin (X, 300); Lin (Y, 65)]    |           50 | all_perms      | no_zero   |
+| Vars    | Perms   | Class               | Specification                   | Permutations | Transpositions | Exclude   |
+|---------+---------+---------------------+---------------------------------+--------------+----------------+-----------|
+| one     | handful | only_x              | Sq (X, 1)                       |           10 | all_perms      | no_zero   |
+| one     | handful | only_y              | Sq (Y, 1)                       |           10 | col_perms      | no_zero   |
+| one     | handful | mixed               | Quad (X, 1, Y, 1)               |           10 | all_perms      | no_zero   |
+| one     | handful | separate            | Sum [Sq (X, 1); Sq (Y, 1)]      |           10 | all_perms      | no_zero   |
+| one     | handful | linear_x            | Sum [Lin (X, 2); Sq (Y, 1)]     |           10 | all_perms      | no_linear |
+| one     | handful | linear_y            | Sum [Sq (X, 1); Lin (Y, 2)]     |           10 | all_perms      | no_linear |
+| one     | handful | pure_linear_only_x  | Lin (X, 2)                      |           10 | all_perms      | no_zero   |
+| one     | handful | pure_linear_only_y  | Lin (Y, 2)                      |           10 | col_perms      | no_zero   |
+| one     | handful | pure_linear_x_and_y | Sum [Lin (X, 2); Lin (Y, 1)]    |           10 | all_perms      | no_zero   |
+|---------+---------+---------------------+---------------------------------+--------------+----------------+-----------|
+| handful | handful | only_x              | Sq (X, 2)                       |           10 | all_perms      | no_zero   |
+| handful | handful | only_y              | Sq (Y, 2)                       |           10 | col_perms      | no_zero   |
+| handful | handful | mixed               | Quad (X, 2, Y, 2)               |           10 | all_perms      | no_zero   |
+| handful | handful | separate            | Sum [Sq (X, 2); Sq (Y, 2)]      |           10 | all_perms      | no_zero   |
+| handful | handful | linear_x            | Sum [Lin (X, 3); Sq (Y, 2)]     |           10 | all_perms      | no_linear |
+| handful | handful | linear_y            | Sum [Sq (X, 2); Lin (Y, 3)]     |           10 | all_perms      | no_linear |
+| handful | handful | pure_linear_only_x  | Lin (X, 3)                      |           10 | all_perms      | no_zero   |
+| handful | handful | pure_linear_only_y  | Lin (Y, 3)                      |           10 | col_perms      | no_zero   |
+| handful | handful | pure_linear_x_and_y | Sum [Lin (X, 2); Lin (Y, 2)]    |           10 | all_perms      | no_zero   |
+|---------+---------+---------------------+---------------------------------+--------------+----------------+-----------|
+| few     | few     | only_x              | Sq (X, 3)                       |           50 | all_perms      | no_zero   |
+| few     | few     | only_y              | Sq (Y, 3)                       |           50 | col_perms      | no_zero   |
+| few     | few     | mixed               | Quad (X, 3, Y, 3)               |           50 | all_perms      | no_zero   |
+| few     | few     | separate            | Sum [Sq (X, 3); Sq (Y, 3)]      |           50 | all_perms      | no_zero   |
+| few     | few     | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]     |           50 | all_perms      | no_linear |
+| few     | few     | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]     |           50 | all_perms      | no_linear |
+| few     | few     | pure_linear_only_x  | Lin (X, 10)                     |           50 | all_perms      | no_zero   |
+| few     | few     | pure_linear_only_y  | Lin (Y, 10)                     |           50 | col_perms      | no_zero   |
+| few     | few     | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]    |           50 | all_perms      | no_zero   |
+|---------+---------+---------------------+---------------------------------+--------------+----------------+-----------|
+| few     | many    | only_x              | Sq (X, 3)                       |          500 | all_perms      | no_zero   |
+| few     | many    | only_y              | Sq (Y, 3)                       |          500 | col_perms      | no_zero   |
+| few     | many    | mixed               | Quad (X, 3, Y, 3)               |          500 | all_perms      | no_zero   |
+| few     | many    | separate            | Sum [Sq (X, 3); Sq (Y, 3)]      |          500 | all_perms      | no_zero   |
+| few     | many    | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]     |          500 | all_perms      | no_linear |
+| few     | many    | linear_y            | Sum [Sq (X, 3); Lin (Y, 7)]     |          500 | all_perms      | no_linear |
+| few     | many    | pure_linear_only_x  | Lin (X, 10)                     |          500 | all_perms      | no_zero   |
+| few     | many    | pure_linear_only_y  | Lin (Y, 10)                     |          500 | col_perms      | no_zero   |
+| few     | many    | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 5)]    |          500 | all_perms      | no_zero   |
+|---------+---------+---------------------+---------------------------------+--------------+----------------+-----------|
+| many    | few     | only_x              | Sq (X, 12)                      |           50 | all_perms      | no_zero   |
+| many    | few     | only_y              | Sq (Y, 12)                      |           50 | col_perms      | no_zero   |
+| many    | few     | mixed               | Quad (X, 12, Y, 12)             |           50 | all_perms      | no_zero   |
+| many    | few     | separate            | Sum [Sq (X, 10); Sq (Y, 10)]    |           50 | all_perms      | no_zero   |
+| many    | few     | linear_x            | Sum [Lin (X, 100); Sq (Y, 10)]  |           50 | all_perms      | no_linear |
+| many    | few     | linear_y            | Sum [Sq (X, 10); Lin (Y, 75)]   |           50 | all_perms      | no_linear |
+| many    | few     | pure_linear_only_x  | Lin (X, 500)                    |           50 | all_perms      | no_zero   |
+| many    | few     | pure_linear_only_y  | Lin (Y, 85)                     |           50 | col_perms      | no_zero   |
+| many    | few     | pure_linear_x_and_y | Sum [Lin (X, 300); Lin (Y, 65)] |           50 | all_perms      | no_zero   |
+
+
+
+
+** \(n = 20, \ldots, 35\)
+
+We are now down to \(n = 20\) examples. That means, we have \(20\)
+many \(y\)'s and \(400\) many \(x\)'s. Again, having a "numerous"
+category does not make much sense here.
+
+
+#+NAME: experiments-20
+| Vars    | Perms   | Class               | Specification                  | Permutations | Transpositions | Exclude   |
+|---------+---------+---------------------+--------------------------------+--------------+----------------+-----------|
+| one     | handful | only_x              | Sq (X, 1)                      |           10 | all_perms      | no_zero   |
+| one     | handful | only_y              | Sq (Y, 1)                      |           10 | col_perms      | no_zero   |
+| one     | handful | mixed               | Quad (X, 1, Y, 1)              |           10 | all_perms      | no_zero   |
+| one     | handful | separate            | Sum [Sq (X, 1); Sq (Y, 1)]     |           10 | all_perms      | no_zero   |
+| one     | handful | linear_x            | Sum [Lin (X, 2); Sq (Y, 1)]    |           10 | all_perms      | no_linear |
+| one     | handful | linear_y            | Sum [Sq (X, 1); Lin (Y, 2)]    |           10 | all_perms      | no_linear |
+| one     | handful | pure_linear_only_x  | Lin (X, 2)                     |           10 | all_perms      | no_zero   |
+| one     | handful | pure_linear_only_y  | Lin (Y, 2)                     |           10 | col_perms      | no_zero   |
+| one     | handful | pure_linear_x_and_y | Sum [Lin (X, 2); Lin (Y, 1)]   |           10 | all_perms      | no_zero   |
+|---------+---------+---------------------+--------------------------------+--------------+----------------+-----------|
+| handful | handful | only_x              | Sq (X, 2)                      |           10 | all_perms      | no_zero   |
+| handful | handful | only_y              | Sq (Y, 2)                      |           10 | col_perms      | no_zero   |
+| handful | handful | mixed               | Quad (X, 2, Y, 2)              |           10 | all_perms      | no_zero   |
+| handful | handful | separate            | Sum [Sq (X, 2); Sq (Y, 2)]     |           10 | all_perms      | no_zero   |
+| handful | handful | linear_x            | Sum [Lin (X, 3); Sq (Y, 2)]    |           10 | all_perms      | no_linear |
+| handful | handful | linear_y            | Sum [Sq (X, 2); Lin (Y, 3)]    |           10 | all_perms      | no_linear |
+| handful | handful | pure_linear_only_x  | Lin (X, 3)                     |           10 | all_perms      | no_zero   |
+| handful | handful | pure_linear_only_y  | Lin (Y, 3)                     |           10 | col_perms      | no_zero   |
+| handful | handful | pure_linear_x_and_y | Sum [Lin (X, 2); Lin (Y, 2)]   |           10 | all_perms      | no_zero   |
+|---------+---------+---------------------+--------------------------------+--------------+----------------+-----------|
+| few     | handful | only_x              | Sq (X, 3)                      |           10 | all_perms      | no_zero   |
+| few     | handful | only_y              | Sq (Y, 3)                      |           10 | col_perms      | no_zero   |
+| few     | handful | mixed               | Quad (X, 3, Y, 3)              |           10 | all_perms      | no_zero   |
+| few     | handful | separate            | Sum [Sq (X, 3); Sq (Y, 3)]     |           10 | all_perms      | no_zero   |
+| few     | handful | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]    |           10 | all_perms      | no_linear |
+| few     | handful | linear_y            | Sum [Sq (X, 3); Lin (Y, 5)]    |           10 | all_perms      | no_linear |
+| few     | handful | pure_linear_only_x  | Lin (X, 7)                     |           10 | all_perms      | no_zero   |
+| few     | handful | pure_linear_only_y  | Lin (Y, 7)                     |           10 | col_perms      | no_zero   |
+| few     | handful | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 4)]   |           10 | all_perms      | no_zero   |
+|---------+---------+---------------------+--------------------------------+--------------+----------------+-----------|
+| few     | few     | only_x              | Sq (X, 3)                      |           50 | all_perms      | no_zero   |
+| few     | few     | only_y              | Sq (Y, 3)                      |           50 | col_perms      | no_zero   |
+| few     | few     | mixed               | Quad (X, 3, Y, 3)              |           50 | all_perms      | no_zero   |
+| few     | few     | separate            | Sum [Sq (X, 3); Sq (Y, 3)]     |           50 | all_perms      | no_zero   |
+| few     | few     | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]    |           50 | all_perms      | no_linear |
+| few     | few     | linear_y            | Sum [Sq (X, 3); Lin (Y, 5)]    |           50 | all_perms      | no_linear |
+| few     | few     | pure_linear_only_x  | Lin (X, 7)                     |           50 | all_perms      | no_zero   |
+| few     | few     | pure_linear_only_y  | Lin (Y, 7)                     |           50 | col_perms      | no_zero   |
+| few     | few     | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 4)]   |           50 | all_perms      | no_zero   |
+|---------+---------+---------------------+--------------------------------+--------------+----------------+-----------|
+| few     | many    | only_x              | Sq (X, 3)                      |          500 | all_perms      | no_zero   |
+| few     | many    | only_y              | Sq (Y, 3)                      |          500 | col_perms      | no_zero   |
+| few     | many    | mixed               | Quad (X, 3, Y, 3)              |          500 | all_perms      | no_zero   |
+| few     | many    | separate            | Sum [Sq (X, 3); Sq (Y, 3)]     |          500 | all_perms      | no_zero   |
+| few     | many    | linear_x            | Sum [Lin (X, 7); Sq (Y, 3)]    |          500 | all_perms      | no_linear |
+| few     | many    | linear_y            | Sum [Sq (X, 3); Lin (Y, 5)]    |          500 | all_perms      | no_linear |
+| few     | many    | pure_linear_only_x  | Lin (X, 7)                     |          500 | all_perms      | no_zero   |
+| few     | many    | pure_linear_only_y  | Lin (Y, 7)                     |          500 | col_perms      | no_zero   |
+| few     | many    | pure_linear_x_and_y | Sum [Lin (X, 5); Lin (Y, 4)]   |          500 | all_perms      | no_zero   |
+|---------+---------+---------------------+--------------------------------+--------------+----------------+-----------|
+| many    | few     | only_x              | Sq (X, 12)                     |           50 | all_perms      | no_zero   |
+| many    | few     | only_y              | Sq (Y, 12)                     |           50 | col_perms      | no_zero   |
+| many    | few     | mixed               | Quad (X, 12, Y, 12)            |           50 | all_perms      | no_zero   |
+| many    | few     | separate            | Sum [Sq (X, 10); Sq (Y, 7)]    |           50 | all_perms      | no_zero   |
+| many    | few     | linear_x            | Sum [Lin (X, 60); Sq (Y, 7)]   |           50 | all_perms      | no_linear |
+| many    | few     | linear_y            | Sum [Sq (X, 10); Lin (Y, 12)]  |           50 | all_perms      | no_linear |
+| many    | few     | pure_linear_only_x  | Lin (X, 80)                    |           50 | all_perms      | no_zero   |
+| many    | few     | pure_linear_only_y  | Lin (Y, 15)                    |           50 | col_perms      | no_zero   |
+| many    | few     | pure_linear_x_and_y | Sum [Lin (X, 50); Lin (Y, 15)] |           50 | all_perms      | no_zero   |
+
+
+
+
+** TODO Relative Template
+
+This template contains specifications for experiments with relative
+numbers of variables. More precisely, the numbers of variables are
+stated in the format \(u/p/v\) where \(u \in \NN\) is the minimum
+number of selected variables, \(p \in (0,1)\) is a proportion factor,
+and \(v \in \NN\) is the maximum number of selected
+variables. Assuming that \(n\) variables are available in total, the
+generators will then choose
+\begin{equation*}
+  \min \{v, \max \{\lceil p n\rceil\}\}
+\end{equation*}
+variables for the specification.
+
+Note that if there are \(n\) bin variables \(y_1, \ldots, y_n\), then
+there are \(n^2\) selector variables \(x_{11}, \ldots, x_{1n}, \ldots,
+x_{n1}, \ldots, x_{nn}\). Hence, the factors \(p\) for the selector variables
+
+
+#+NAME: experiments-relative
+| Vars | Perms | Class               | Specification                                  | Permutations | Transpositions | Exclude   |
+|------+-------+---------------------+------------------------------------------------+--------------+----------------+-----------|
+| few  | few   | only_x              | Sq (X, 3/0.0/3)                                |           50 | all_perms      | no_zero   |
+| few  | few   | only_y              | Sq (Y, 3/0.0/3)                                |           50 | col_perms      | no_zero   |
+| few  | few   | mixed               | Quad (X, 3/0.0/3, Y, 3/0.0/3)                  |           50 | all_perms      | no_zero   |
+| few  | few   | separate            | Sum [Sq (X, 3/0.0/3); Sq (Y, 3/0.0/3)]         |           50 | all_perms      | no_zero   |
+| few  | few   | linear_x            | Sum [Lin (X, 7/0.0/7); Sq (Y, 3/0.0/3)]        |           50 | all_perms      | no_linear |
+| few  | few   | linear_y            | Sum [Sq (X, 3/0.0/3); Lin (Y, 7/0.0/7)]        |           50 | all_perms      | no_linear |
+| few  | few   | pure_linear_only_x  | Lin (X, 10/0.0/10)                             |           50 | all_perms      | no_zero   |
+| few  | few   | pure_linear_only_y  | Lin (Y, 10/0.0/10)                             |           50 | col_perms      | no_zero   |
+| few  | few   | pure_linear_x_and_y | Sum [Lin (X, 5/0.0/5); Lin (Y, 5/0.0/5)]       |           50 | all_perms      | no_zero   |
+|------+-------+---------------------+------------------------------------------------+--------------+----------------+-----------|
+| few  | many  | only_x              | Sq (X, 3/0.0/3)                                |          500 | all_perms      | no_zero   |
+| few  | many  | only_y              | Sq (Y, 3/0.0/3)                                |          500 | col_perms      | no_zero   |
+| few  | many  | mixed               | Quad (X, 3/0.0/3, Y, 3/0.0/3)                  |          500 | all_perms      | no_zero   |
+| few  | many  | separate            | Sum [Sq (X, 3/0.0/3); Sq (Y, 3/0.0/3)]         |          500 | all_perms      | no_zero   |
+| few  | many  | linear_x            | Sum [Lin (X, 7/0.0/7); Sq (Y, 3/0.0/3)]        |          500 | all_perms      | no_linear |
+| few  | many  | linear_y            | Sum [Sq (X, 3/0.0/3); Lin (Y, 7/0.0/7)]        |          500 | all_perms      | no_linear |
+| few  | many  | pure_linear_only_x  | Lin (X, 10/0.0/10)                             |          500 | all_perms      | no_zero   |
+| few  | many  | pure_linear_only_y  | Lin (Y, 10/0.0/10)                             |          500 | col_perms      | no_zero   |
+| few  | many  | pure_linear_x_and_y | Sum [Lin (X, 5/0.0/5); Lin (Y, 5/0.0/5)]       |          500 | all_perms      | no_zero   |
+|------+-------+---------------------+------------------------------------------------+--------------+----------------+-----------|
+| many | few   | only_x              | Sq (X, 12/0.0/12)                              |           50 | all_perms      | no_zero   |
+| many | few   | only_y              | Sq (Y, 12/0.0/12)                              |           50 | col_perms      | no_zero   |
+| many | few   | mixed               | Quad (X, 12/0.0/12, Y, 12/0.0/12)              |           50 | all_perms      | no_zero   |
+| many | few   | separate            | Sum [Sq (X, 10/0.0/10); Sq (Y, 10/0.0/10)]     |           50 | all_perms      | no_zero   |
+| many | few   | linear_x            | Sum [Lin (X, 100/0.0/100); Sq (Y, 10/0.0/10)]  |           50 | all_perms      | no_linear |
+| many | few   | linear_y            | Sum [Sq (X, 10/0.0/10); Lin (Y, 75/0.0/75)]    |           50 | all_perms      | no_linear |
+| many | few   | pure_linear_only_x  | Lin (X, 500/0.0/500)                           |           50 | all_perms      | no_zero   |
+| many | few   | pure_linear_only_y  | Lin (Y, 85/0.0/85)                             |           50 | col_perms      | no_zero   |
+| many | few   | pure_linear_x_and_y | Sum [Lin (X, 300/0.0/300); Lin (Y, 65/0.0/65)] |           50 | all_perms      | no_zero   |
 
 
 
 
 * Making Breakers for All Files in a Directory
 
-This script runs the breaker generation for all ~.LP~ files in the
+This script runs the breaker generation for all {{{LP}}} files in the
 current directory (assuming that the ~breakers.native~ binary is in the
-same directory). The results for each ~.LP~ are put into a zip file.
+same directory). The results for each {{{LP}}} are put into a zip
+file.
 
 #+BEGIN_SRC bash :tangle break_all.sh :mkdirp yes :eval never
 #!/bin/bash
@@ -1337,8 +1995,15 @@ for I in *.lp
 do
     B=`basename -s '.lp' "$I"`
     breakers.native "$I"
-    zip "${B}__breakers.zip" "${B}__"*.lp
+    zip "${B}__breakers_LP.zip" "${B}__"*.lp
     rm "${B}__"*.lp
+done
+for I in *.smt2
+do
+    B=`basename -s '.smt2' "$I"`
+    breakers.native --smt2 "$I"
+    zip "${B}__breakers_SMT2.zip" "${B}__"*.smt2
+    rm "${B}__"*.smt2
 done
 #+END_SRC
 
@@ -1367,3 +2032,5 @@ done
 #+MACRO: Opam [[https://opam.ocaml.org][opam]]
 #+MACRO: Haskell [[https://wiki.haskell.org/Haskell][Haskell]]
 
+#+MACRO: LP ~.lp~
+#+MACRO: SMT2 ~.smt2~
