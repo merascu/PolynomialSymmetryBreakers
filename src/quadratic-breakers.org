@@ -44,40 +44,9 @@ on [[#reading-sizes][reading the sizes list]] for an explanation of how the item
 should be specified in the input files.
 
 
-* Changes [0/4]
+* Changes [2/3]
 
-** TODO Determine Number of Variables in Breakers from Problem Size [0/3]
-
-If the problem has \(n\) bins, then there will be \(n\) bin variables
-\(y_1, \ldots, y_n\) and \(n^2\) selector variables \(x_{11}, \ldots,
-x_{1n}, \ldots, x_{n1}, \ldots, x_{nn}\). If \(n\) is too small, then
-the (currently) hard-coded number of variables which we select
-randomly from the pool of all variables can exceed the number of
-available variables. Hence, we will add an option for relative sizes
-where the linear polynomials will use \(\lceil p n \rceil\) bin
-variables or \(\lceil p n^2 \rceil\) selector variables for some \(p
-\in (0,1)\).
-
-For now, the exact value of \(p\) will be hard-coded for each
-template. We will also add a minimum size so that we do not end up
-with just single variables for the linear polynomials. Similarly, a
-maximum size might make sense.
-
-
-*** TODO Add Command Line Options
-
-We need a command line option parser. For now, it will accept a single
-option ~--relative~ (in addition to the LP or SMT2 file name).
-
-We will use {{{OCaml}}}'s built-in ~Arg~ module for now.
-
-
-*** TODO Add Relative Linear Polynomial Sizes
-
-Find suitable \(p\) for each template.
-
-
-** TODO Include all Fixed Size Tables and Pick Based on Input Size
+** DONE Include all Fixed Size Tables and Pick Based on Input Size
 
 An alternative method to the relative size selection would be to have
 a collection of fixed size tables and pick one based on the number of
@@ -87,49 +56,7 @@ sizes \(n \in [20, 30)\), another one could cover input sizes \(n \in
 
 
 
-** TODO More Efficient Generation of Breakers [0/2]
-
-Instead of generating breakers completely at random, they should take
-the polynomial \(h\) into account. In particular, if \(h \in \RR[x, y]
-\setminus \{0\}\) is given, let \(\vars h\) denote the *variables* of
-\(h\) which is defined as the set of variables which occur in
-\(h\). (That is, all variables \(x_{i,k}\) or \(y_k\) for which there
-exists a term \(a m\) in \(h\) such that \(a \in \RR \setminus \{0\}\)
-and \(m\) is a power product with \(x_{i,k} \mid m\) or \(y_k \mid
-m\).) We then only want to generate transpositions which move at least
-one \(z \in \vars h\).
-
-
-*** TODO Implement the Variables Function
-
-Implement an {{{OCaml}}} version of \(\vars\).
-
-It will also be convenient to have a "rows" function which returns all
-\(i\) such that \(x_{i,k} \in \vars h\) for some \(k\) and an
-analogous "columns" function which returns all \(k\) such that \(y_k
-\in \vars h\) or there exists some \(i\) with \(x_{i,k} \in \vars h\).
-
-
-*** TODO Adjust the Transposition Generation
-
-Make sure that transpositions take \(\vars h\) into account.
-
-That is, we will want to generate only permutations of the form ~Row
-(i, j)~ where \(i\) is such that \(x_{i,k}\) occurs in \(h\) or ~Col (k,
-j)~ where \(k\) is such that \(x_{i,k}\) or \(y_k\) occur in \(h\).
-
-Since the variables of \(h\) change as we keep applying
-transpositions, there should be a function which generates a single
-random (row or column) transposition of the kind described above which
-can then be applied immediately. The overall algorithm would be to
-compute the variables, generate a transposition, apply it to \(h\),
-replace \(h\) with the result, and then repeat this several
-times. Optionally, we could keep the original polynomial around to
-make sure that we never get back to it.
-
-
-
-** TODO Add SMT2 Output Format
+** DONE Add SMT2 Output Format
 
 Seems to be just some dialect of LISP.
 
@@ -163,6 +90,50 @@ Example: A problem contraint from one of {{{ME}}}'s problems:
 
 
 
+** TODO More Efficient Generation of Breakers [1/2]
+
+Instead of generating breakers completely at random, they should take
+the polynomial \(h\) into account. In particular, if \(h \in \RR[x, y]
+\setminus \{0\}\) is given, let \(\vars h\) denote the *variables* of
+\(h\) which is defined as the set of variables which occur in
+\(h\). (That is, all variables \(x_{i,k}\) or \(y_k\) for which there
+exists a term \(a m\) in \(h\) such that \(a \in \RR \setminus \{0\}\)
+and \(m\) is a power product with \(x_{i,k} \mid m\) or \(y_k \mid
+m\).) We then only want to generate transpositions which move at least
+one \(z \in \vars h\).
+
+
+*** DONE Implement the Variables Function
+
+Implement an {{{OCaml}}} version of \(\vars\). Start with a \(\supp\)
+("support") function for free Abelian groups (returning all those
+generators which have a non-zero coefficient).
+
+It will also be convenient to have a "rows" function which returns all
+\(i\) such that \(x_{i,k} \in \vars h\) for some \(k\) and an
+analogous "columns" function which returns all \(k\) such that \(y_k
+\in \vars h\) or there exists some \(i\) with \(x_{i,k} \in \vars h\).
+
+
+*** TODO Adjust the Transposition Generation
+
+Make sure that transpositions take \(\vars h\) into account.
+
+That is, we will want to generate only permutations of the form ~Row
+(i, j)~ where \(i\) is such that \(x_{i,k}\) occurs in \(h\) or ~Col (k,
+j)~ where \(k\) is such that \(x_{i,k}\) or \(y_k\) occur in \(h\).
+
+Since the variables of \(h\) change as we keep applying
+transpositions, there should be a function which generates a single
+random (row or column) transposition of the kind described above which
+can then be applied immediately. The overall algorithm would be to
+compute the variables, generate a transposition, apply it to \(h\),
+replace \(h\) with the result, and then repeat this several
+times. Optionally, we could keep the original polynomial around to
+make sure that we never get back to it.
+
+
+
 * Some Helper Functions
 
 Here we collect some auxiliary functions which are too general to fit
@@ -192,6 +163,12 @@ successor (ie, \(x_i \neq x_{i+1}\). The resulting list will be sorted
 ascendingly and it will also include the extreme indices \(0\) and
 \(m\) (change from list to nothing).
 
+We offer a function which returns the unique elements of a list (as
+determined by a comparison function in the same style that the
+{{{OCaml}}}} standard library uses). Note that the function does not
+preserve the order of the elements (since it is more efficient to sort
+the list than to filter out all duplicates for each element).
+
 Finally, there is a function which generates (and sets) a new random
 seed. We return the generated seed for printing. (Notice that we only
 generate seeds between \(1\,000\) and \(9\,999\) simply because it
@@ -217,6 +194,19 @@ module Aux = struct
     in
     0 :: loop 1 sizes
 
+
+  let unique compare list =
+    let rec loop = function
+      | [] -> []
+      | [x] -> [x]
+      | x :: y :: rest ->
+         match compare x y with
+           | 0 -> loop (x :: rest)
+           | _ -> x :: loop (y :: rest)
+    in
+    loop (List.sort compare list)
+
+
   let seed () =
     Random.self_init ();
     let s = 1_000 + Random.int 9_000 in
@@ -237,10 +227,12 @@ two pretty printers for variables: one for {{{LP}}} syntax and one for
 additional parameter that is used for reducing the amount of
 parentheses. (On the single variable level these print the same, but
 the code in the other modules will look cleaner if the functions have
-different names.) Finally, we define an order which has \(x_{i,k} <
-y_\ell\) for all \(i,k,\ell\), \(y_k < y_\ell\) iff \(k < \ell\), and
-\(x_{i,k} < x_{j,\ell}\) if \((i,k)\) is less than \((j,\ell)\)
-lexicographically.
+different names.) We also define functions which return the row and
+column indices of a variable. Note that the row index function returns
+an option since bin variables \(y_k\) do not have a row. Finally, we
+define an order which has \(x_{i,k} < y_\ell\) for all \(i,k,\ell\),
+\(y_k < y_\ell\) iff \(k < \ell\), and \(x_{i,k} < x_{j,\ell}\) if
+\((i,k)\) is less than \((j,\ell)\) lexicographically.
 
 We decided to put stuff into modules even though we are just tangling
 everything into a single file. This way, we already have some
@@ -266,6 +258,13 @@ module Var = struct
 
   let sexp ?(in_product = false) = show
 
+
+  let row = function
+      | X (i, _) -> Some i
+      | Y _ -> None
+  and column = function
+      | X (_, k) -> k
+      | Y k -> k
 
   let compare v w =
     match v, w with
@@ -538,7 +537,12 @@ needs to ensure the assumptions of our format, while the conversion
 functions from group elements to lists is trivial. In order to ensure
 that arbitrary lists conform to our assumptions, we can simply use the
 mapping function since the steps (sorting the terms by generators and
-combining terms with the same generator) are exactly the same.
+combining terms with the same generator) are exactly the same. The
+last function computes the support of a group element which we define
+to be all the generators which occur in the group element with a
+non-zero coefficient. Based on our assumptions about how group
+elements are represented, we can compute the support simply by
+forgetting all the coefficients.
 
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
@@ -567,6 +571,7 @@ module Abelian (S : OrderedSet) : sig
   val map_coeff : (coefficient -> coefficient) -> t -> t
   val to_list : t -> term list
   val of_list : term list -> t
+  val support : t -> S.t list
 end = struct
   type coefficient = int
   type generator = S.t
@@ -691,6 +696,8 @@ end = struct
   let to_list t = t
 
   let of_list ts = map_gen Fun.id ts
+
+  let support = List.map snd
   
   let ( + ) = add and ( - ) = subtract and ( ~- ) = negate
 end
@@ -701,11 +708,16 @@ end
 * Polynomials
 
 We can now easily define linear polynomials as a free Abelian group
-generated by variables. 
+generated by variables. We also add a function to extract all the
+variables. For linear monomials this is somewhat pointless---however,
+it simplifies the implementation below if we do not need to worry
+about special cases.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 module LinearMonomial = struct
   include Var
+
+  let vars a = [a]
 end
 
 module Linear = Abelian(LinearMonomial)
@@ -737,6 +749,11 @@ module QuadraticMonomial = struct
       | q -> q
 
   let apply p (u, v) = make (Perm.apply p u) (Perm.apply p v)
+
+  let vars (u, v) =
+    if Var.compare u v = 0
+    then [u]
+    else [u; v]
 
   let show ff (u, v) =
     if Var.compare u v = 0
@@ -775,6 +792,12 @@ say that a polynomial \(h\) is
 + purely quadratic :: if \(h\) is quadratic and \(h\) has no linear
   terms.
 
+
+The function which computes the variables in a polynomial first
+extracts the variables from the linear and quadratic component and
+then passes them through a set in order to make sure that each
+variable occurs only once in the output.
+
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 module Polynomial = struct
   type t = {linear : Linear.t; quadratic : Quadratic.t}
@@ -804,6 +827,27 @@ module Polynomial = struct
     {linear = Linear.subtract la lb; quadratic = Quadratic.subtract qa qb}
 
   let ( + ) = add and ( - ) = subtract
+
+
+  let vars {linear; quadratic} =
+    let module S = Set.Make(Var) in
+    let lvars = Linear.support linear |> List.map LinearMonomial.vars
+    and qvars = Quadratic.support quadratic |> List.map QuadraticMonomial.vars
+    in
+    List.concat (lvars @ qvars)
+    |> S.of_list
+    |> S.to_list
+
+  let rows poly =
+    vars poly 
+    |> List.map Var.row
+    |> List.map Option.to_list
+    |> List.concat
+    |> Aux.unique Int.compare
+  and columns poly =
+    vars poly
+    |> List.map Var.column
+    |> Aux.unique Int.compare
 
 
   let compare {linear = la; quadratic = qa} {linear = lb; quadratic = qb} =
@@ -1236,18 +1280,18 @@ functions. The first version of the function
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 type var = X | Y
 
-type fixed_spec =
+type spec =
   | Lin of (var * int)
   | Sq of (var * int)
   | Quad of (var * int * var * int)
-  | Sum of fixed_spec list
+  | Sum of spec list
 
-let fixed_lin var n = Lin (var, n)
-and fixed_sq var n = Sq (var, n)
-and fixed_quad var1 n1 var2 n2 = Quad (var1, n1, var2, n2)
-and fixed_sum list = Sum list
+let lin var n = Lin (var, n)
+and sq var n = Sq (var, n)
+and quad var1 n1 var2 n2 = Quad (var1, n1, var2, n2)
+and sum list = Sum list
 
-let rec of_fixed_spec ({xs; ys; m; n} as bins) = function
+let rec of_spec ({xs; ys; m; n} as bins) = function
   | Lin (X, n) -> random_linear ~vars:xs ~len:n
   | Lin (Y, n) -> random_linear ~vars:ys ~len:n
   | Sq (X, n) -> random_quadratic ~vars1:xs ~len1:n ~vars2:xs ~len2:n
@@ -1257,113 +1301,14 @@ let rec of_fixed_spec ({xs; ys; m; n} as bins) = function
   | Quad (Y, m, X, n) -> random_quadratic ~vars1:ys ~len1:m ~vars2:xs ~len2:n
   | Quad (Y, m, Y, n) -> random_quadratic ~vars1:ys ~len1:m ~vars2:ys ~len2:n
   | Sum sps ->
-     List.map (of_fixed_spec bins) sps
+     List.map (of_spec bins) sps
      |> List.fold_left Polynomial.add Polynomial.zero
 #+END_SRC
 
 
 
 
-** COMMENT Relative Polynomial Specifications
-
-For relative breaker sizes, we introduce a new specification type
-where the single integer values are replaced by a relative size type
-with a minimum value \(u \in \NN\), a maximum value \(v \in \NN\), and
-a scaling factor \(p \in (0,1)\). Given the number \(n\) of available
-variables, we will then randomly choose
-\begin{equation*}
-  \max \{\min \{ u, \lceil p n \rceil \}, v\}
-\end{equation*}
-many variables.
-
-In order to make the implementation work more smoothly, we also
-redefine the generators for random linear and quadratic polynomials so
-that they apply the relative sizes.
-
-Note that in extreme cases we might still request too many
-variables. (For example, if the minimum \(v\) is larger than the
-number of variables \(n\).) In that case, the program will fail with
-an exception.
-
-#+BEGIN_SRC ocaml :tangle no :eval never
-type relative_size = {
-    minimum : int;
-    factor : float;
-    maximum : int }
-
-let rel_size minimum factor maximum = {minimum; factor; maximum}
-
-type relative_spec =
-  | RelLin of (var * relative_size)
-  | RelSq of (var * relative_size)
-  | RelQuad of (var * relative_size * var * relative_size)
-  | RelSum of relative_spec list
-
-let rel_lin var u p v = RelLin (var, rel_size u p v)
-and rel_sq var u p v = RelSq (var, rel_size u p v)
-and rel_quad var1 u1 p1 v1 var2 u2 p2 v2 =
-  RelQuad (var1, rel_size u1 p1 v1,
-           var2, rel_size u2 p2 v2)
-and rel_sum specs = RelSum specs
-
-let relative {minimum = u; factor = p; maximum = v} n =
-  let pn = ceil (p *. float n) |> int_of_float in
-  let r = max (min u pn) v in
-  if r > n
-  then failwith "Too many variables requested."
-  else r
-
-let relative_random_linear ~vars ~spec =
-  let len = relative spec (Array.length vars) in
-  random_linear ~vars ~len
-
-let relative_random_quadratic ~vars1 ~spec1 ~vars2 ~spec2 =
-  let len1 = relative spec1 (Array.length vars1) 
-  and len2 = relative spec2 (Array.length vars2)
-  in
-  random_quadratic ~vars1 ~len1 ~vars2 ~len2
-
-let rec of_relative_spec spec =
-  match spec with 
-    | RelLin (X, p) -> relative_random_linear ~vars:xs ~spec:p
-    | RelLin (Y, p) -> relative_random_linear ~vars:ys ~spec:p
-    | RelSq (X, p) ->
-       relative_random_quadratic ~vars1:xs ~spec1:p ~vars2:xs ~spec2:p
-    | RelSq (Y, p) ->
-       relative_random_quadratic ~vars1:ys ~spec1:p ~vars2:ys ~spec2:p
-    | RelQuad (X, p, X, q) ->
-       relative_random_quadratic ~vars1:xs ~spec1:p ~vars2:xs ~spec2:q
-    | RelQuad (X, p, Y, q) ->
-       relative_random_quadratic ~vars1:xs ~spec1:p ~vars2:ys ~spec2:q
-    | RelQuad (Y, p, X, q) ->
-       relative_random_quadratic ~vars1:ys ~spec1:p ~vars2:xs ~spec2:q
-    | RelQuad (Y, p, Y, q) ->
-       relative_random_quadratic ~vars1:ys ~spec1:p ~vars2:ys ~spec2:q
-    | RelSum sps ->
-       List.map of_relative_spec sps
-       |> List.fold_left Polynomial.add Polynomial.zero
-#+END_SRC
-
-
-
 ** Experiment Specifications
-
-In order to treat both fixed and relative polynomial specification
-cases with the same code, we combine them into a common type.
-
-#+BEGIN_SRC ocaml :tangle no :eval never
-type spec = Fixed of fixed_spec | Relative of relative_spec
-
-let of_spec = function
-  | Fixed spec -> of_fixed_spec spec
-  | Relative spec -> of_relative_spec spec
-#+END_SRC
-
-
-#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
-let of_spec = of_fixed_spec
-#+END_SRC
-
 
 
 An experiment specification consists of
@@ -1378,8 +1323,10 @@ An experiment specification consists of
 + a specificiation for the base polynomial.
 
 We provide abbreviations for the two most common exclusion
-criteria. Moreover, we provide a function which allows to run a
-specificiation directly.
+criteria. These will be used in the [[#template-tables][template tables]]. We also provide
+abbreviations for extracting the different kinds of permutations from
+a symmetries specificiation. Moreover, we provide a function which
+allows to run a specificiation directly.
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 type experiment = {
@@ -1387,7 +1334,7 @@ type experiment = {
     exclude : Polynomial.t -> bool;
     descr : string;
     transpositions : symmetries -> Perm.t array;
-    base : fixed_spec   
+    base : spec   
   }
 
 let no_linear q = Polynomial.(is_zero q || is_linear q)
@@ -1581,18 +1528,36 @@ let parse_arguments =
 
 The following source code block includes the reference to the
 {{{ELisp}}} code in {{{Noweb}}} syntax. It will be replaced by the
-generated code during tangling.
-
-We also include the main function in this code block. It simply
-executes every one of the experiments \(10\) times.
+generated code during tangling. We also provide a function which will
+pick an appropriate template based on the number of variables in the
+problem. (More precisely, the number \(n\).) 
 
 #+BEGIN_SRC ocaml :tangle breakers.ml :noweb no-export
-<<generate-experiments(name="experiments_20", table=experiments-20)>>
-<<generate-experiments(name="experiments_99", table=experiments-99)>>
-<<generate-experiments(name="experiments_700", table=experiments-700)>>
+<<generate-experiments(name="experiments_20",   table=experiments-20)>>
+<<generate-experiments(name="experiments_99",   table=experiments-99)>>
+<<generate-experiments(name="experiments_700",  table=experiments-700)>>
 <<generate-experiments(name="experiments_1000", table=experiments-1000)>>
 <<generate-experiments(name="experiments_2000", table=experiments-2000)>>
 
+
+let select_experiments problem =
+  if      problem.n <   20 then failwith "Not enough variables."
+  else if problem.n <   99 then experiments_20 
+  else if problem.n <  700 then experiments_99 
+  else if problem.n < 1000 then experiments_700
+  else if problem.n < 2000 then experiments_1000
+  else                          experiments_2000
+#+END_SRC
+
+
+The ~run~ function takes a single file name and sets up the
+configuration objects (including the problem specification and the
+symmetry group specification). It then prints the parameters and runs
+the appropriate experiments.
+
+The ~main~ function simply repeats this for every input file.
+ 
+#+BEGIN_SRC ocaml :tangle breakers.ml :eval never
 let run filename =
   let sexp = !flag_smt2_syntax and repeat = !repetitions in
   let conf = configure ~sexp filename in
@@ -1601,12 +1566,7 @@ let run filename =
   show_config conf;
   show_problem problem;
   List.iter (run ~sexp ~problem ~symmetries ~prefix:conf.prefix ~repeat)
-    (if problem.n < 20 then failwith "Two few variables"
-     else if problem.n < 99 then experiments_20 
-     else if problem.n < 700 then experiments_99 
-     else if problem.n < 1000 then experiments_700
-     else if problem.n < 2000 then experiments_1000
-     else experiments_2000)
+    (select_experiments problem)
 
 
 
@@ -1618,6 +1578,11 @@ let main =
 
 
 
+
+* Template Tables
+:PROPERTIES:
+:CUSTOM_ID: template-tables
+:END:
 
 ** \(n = 2\,000\)
 
