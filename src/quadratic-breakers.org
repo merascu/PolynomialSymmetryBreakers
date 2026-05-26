@@ -876,6 +876,7 @@ module Polynomial = struct
       | false, false -> begin
           Format.fprintf ff "(+ ";
           Linear.sexp ~in_sum:true ff linear;
+          Format.fprintf ff " ";
           Quadratic.sexp ~in_sum:true ff quadratic;
           Format.fprintf ff ")"
         end
