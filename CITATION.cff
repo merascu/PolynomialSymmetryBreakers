@@ -1,0 +1,50 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Polynomial Symmetry Breakers
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Mǎdǎlina
+    family-names: Erașcu
+    email: madalina.erascu@e-uvt.ro
+    affiliation: West University of Timișoara
+    orcid: 'https://orcid.org/0000-0002-0435-5883'
+  - given-names: Johannes
+    family-names: Middeke
+    email: johannes.middeke@tuj.temple.edu
+    affiliation: 'Temple University, Japan Campus'
+    orcid: 'https://orcid.org/0009-0007-6716-2433'
+identifiers:
+  - type: url
+    value: 'https://arxiv.org/abs/2602.08297'
+    description: ISSAC 2026 Paper
+repository-code: 'https://github.com/merascu/PolynomialSymmetryBreakers'
+abstract: >-
+  Symmetry in integer programming causes redundant search
+  and is often handled with symmetry breaking constraints
+  that remove as many equivalent solutions as possible. We
+  propose an algebraic method which allows to generate a
+  random family of polynomial inequalities which can be used
+  as symmetry breakers. The method requires as input an
+  arbitrary base polynomial and a group of permutations
+  which is pecific to the integer program. The computations
+  can be easily carried out in any major symbolic
+  computation software. In order to test our approach, we
+  describe a case study on near half-capacity 0-1 bin
+  packing instances which exhibit substantial symmetries. We
+  statically generate random quadratic breakers and add them
+  to a baseline integer programming problem which we then
+  solve with Gurobi. It turns out that simple symmetry
+  breakers, especially combining few variables and
+  permutations, most consistently reduce work time.
+keywords:
+  - algebraic symmetry breaking
+  - integer programming
+  - bin packing
+  - SMT/OMT solvers
+  - mathematical programming solvers
+license: BSD-3-Clause
