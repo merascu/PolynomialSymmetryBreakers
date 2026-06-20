@@ -49,14 +49,14 @@ Please ensure you have these dependencies installed and configured correctly bef
 ## Features and Usage
 
 1. **Bin Packing Instance Generation**
-   - LP files
+   - **LP files**
       - Generates **0–1 bin packing** MILP instances in **LP format**.
       - Run:
         ```bash
         python bin_packing_problem_generator.py --B=100 --n=2000 --classes=5 --seed=2042
         ```
       - Code: 🔗 [bin_packing_problem_generator_LP.py](./src/bin_packing_problem_generator_LP.py)
-   - SMT files
+   - **SMT files**
       - Generates **0–1 bin packing** instances in **SMT2 format**.
    - Run:
       - Example:
