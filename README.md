@@ -15,10 +15,7 @@ We performed an experimental evaluation of this method using several mathematica
 
 It turns out that the effectiveness of polynomial symmetry breaking is strongly solver-dependent. Compact quadratic breaker families can improve performance, whereas linearization, large breaker sets, or solver reformulations may offset these gains through increased model size or less favorable search behavior. These results suggest that automatically generated symmetry breakers should be evaluated in a solver-aware manner rather than treated as solver-independent additions to a model.
 
-This repository accompanies the experimental paper *When Algebraic Symmetry Breaking Meets Solvers: An Experimental Study* submitted at [LPAR 2026]([https://www.issac-conference.org/2026/](https://easychair.org/smart-program/LPAR-26/)). 
-
-This repository accompanies the experimental paper *When Algebraic Symmetry Breaking Meets Solvers: An Experimental Study* submitted at [LPAR 2026]([[https://www.issac-conference.org/2026/](https://easychair.org/smart-program/LPAR-26/)](https://easychair.org/smart-program/LPAR-26/)). 
-
+This repository accompanies the experimental paper *When Algebraic Symmetry Breaking Meets Solvers: An Experimental Study* submitted to [LPAR 2026](https://easychair.org/smart-program/LPAR-26/).
 
 ## Installation
 
