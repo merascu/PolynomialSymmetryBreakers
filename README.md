@@ -106,9 +106,9 @@ Please ensure you have these dependencies installed and configured correctly bef
 
 6. **Extract Solver Metrics to CSV**
    - Parses one file at a time and extracts into a CSV file different metrics, depending on the solver:
-   - Run:
+   - Run (for Gurobi):
       ```bash
-      python extract_to_csv.py in_path="path/to/dir_with_out_files" out_csv="results.csv"
+      python extract_to_csv_Gurobi.py in_path="path/to/dir_with_out_files" out_csv="results.csv"
       ```
    - Code: 🔗 [extract_to_csv_Gurobi.py](./src/extract_to_csv_Gurobi.py), [extract_to_csv_CPLEX.py](./src/extract_to_csv_CPLEX.py), [extract_to_csv_SCIP.py](./src/extract_to_csv_SCIP.py), [extract_to_csv_Z3.py](./src/extract_to_csv_Z3.py)
 
