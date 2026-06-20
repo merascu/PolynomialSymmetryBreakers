@@ -17,6 +17,12 @@ It turns out that the effectiveness of polynomial symmetry breaking is strongly 
 
 This repository accompanies the experimental paper *When Algebraic Symmetry Breaking Meets Solvers: An Experimental Study* submitted to [LPAR 2026](https://easychair.org/smart-program/LPAR-26/).
 
+## LPAR Results
+
+Each directory, coresponding to a solver used in the experiments, in the archive [LPAR2026-eval](???) contains two subfolders:
+1. `lp/SMT2` contains the LP/SMT2 files with the problem instances, together with the corresponding `.out` files containing the solutions.
+2. `csv` contains the CSV files with the time required to find a solution and, where applicable, additional statistics. These files correspond to the `.out` files mentioned above.
+
 ## Installation
 
 ### 1. Clone the repository
