@@ -104,42 +104,25 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```
    - Code: 🔗 [gen_files_with_sbs_LP.py](./src/gen_files_with_sbs_LP.py)
 
-5. **Batch Solve LPs with Gurobi**
-   - Solves with Gurobi every model saved in an `lp` file. Saves the results into `lp_out_files` directory.
+5. **Batch Solve LPs/SMT2s with Gurobi/CPLEX/SCIP/Z3**
+   - Solves with Gurobi/CPLEX/SCIP/Z3 every model saved in an `lp`/`smt2` file. Saves the results into `lp_out_files`/`smt2_out_files` directory.
    - Parameters: `gurobi_cl` is run with the parameters `NonConvex=2`, `Presolve=0`, `Symmetry=0`, `WorkLimit=1800`.
    - Run:
      ```bash
      ./run_all_lp_with_Gurobi.sh <lp_out_files>
      ```
-   - Code: 🔗 [run_all_lp_with_Gurobi.sh](./scripts/run_all_lp_with_Gurobi.sh)
+   - Code: 🔗 [run_all_lp_with_Gurobi.sh](./scripts/run_all_lp_with_Gurobi.sh), [run_all_lp_with_CPLEX.sh](./scripts/run_all_lp_with_CPLEX.sh), [run_all_lp_with_SCIP.sh](./scripts/run_all_lp_with_SCIP.sh), [run_all_lp_with_Z3.sh](./scripts/run_all_lp_with_Z3.sh)
 
 6. **Extract Solver Metrics to CSV**
-   - Parses Gurobi one gurobi file at a time and extracts into a CSV file, by columns:
-      - **`filename`**:
-        Name of the parsed log file.
-      - **`status`**  
-        Solver termination status:
-           - `"Optimal solution found"` if an optimal solution was proven.
-           - `"Time limit reached"` if the run stopped due to the time limit.        
-      - **`objective`**  
-        The value of the optimal solution value **only if** the log contains a line of the form:        
-      - **`gap`**  
-        Final optimality gap reported by Gurobi, extracted from the line:  
-      - **`work_units`**  
-        Gurobi **work units** which are a solver-defined metric computed in an deterministic manner intended to be more comparable across machines than raw runtime.
-      - **`runtime_seconds`**  
-        Total runtime in seconds, extracted from the line:        
-      - **`initial_gap`**  
-        The first gap value reported in the progress table (root/early stage) which approximates the initial difficulty of the instance.
-      - **`simplex_iters`**  
-        Total number of simplex iterations performed.
-      - **`nodes`**  
-        Total number of branch-and-bound nodes explored, extracted from:  
+   - Parses one file at a time and extracts into a CSV file different metrics, depending on the solver:
    - Run:
       ```bash
       python extract_to_csv.py in_path="path/to/dir_with_out_files" out_csv="results.csv"
       ```
-   - Code: 🔗 [extract_to_csv.py](./src/extract_to_csv.py)
+   - Code: 🔗 [extract_to_csv_Gurobi.py](./src/extract_to_csv_Gurobi.py), [extract_to_csv_CPLEX.py](./src/extract_to_csv_CPLEX.py), [extract_to_csv_SCIP.py](./src/extract_to_csv_SCIP.py), [extract_to_csv_Z3.py](./src/extract_to_csv_Z3.py)
+
+
+
 
 
 ## License
