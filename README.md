@@ -96,11 +96,10 @@ Please ensure you have these dependencies installed and configured correctly bef
    - Code: 🔗 [gen_files_with_sbs_LP.py](./src/gen_files_with_sbs_LP.py)
 
 5. **Batch Solve LPs/SMT2s with Gurobi/CPLEX/SCIP/Z3**
-   - Solves with Gurobi/CPLEX/SCIP/Z3 every model saved in an `lp`/`smt2` file. Saves the results into `lp_out_files`/`smt2_out_files` directory.
-   - Parameters: `gurobi_cl` is run with the parameters `NonConvex=2`, `Presolve=0`, `Symmetry=0`, `WorkLimit=1800`.
+   - Solves with Gurobi/CPLEX/SCIP/Z3 every model saved in an `lp`/`smt2` file. Saves the results into `out_files` directory.
    - Run:
      ```bash
-     ./run_all_lp_with_Gurobi.sh <lp_out_files>
+     ./run_all_lp_with_Gurobi.sh <out_files>
      ```
    - Code: 🔗 [run_all_lp_with_Gurobi.sh](./scripts/run_all_lp_with_Gurobi.sh), [run_all_lp_with_CPLEX.sh](./scripts/run_all_lp_with_CPLEX.sh), [run_all_lp_with_SCIP.sh](./scripts/run_all_lp_with_SCIP.sh), [run_all_lp_with_Z3.sh](./scripts/run_all_lp_with_Z3.sh)
 
