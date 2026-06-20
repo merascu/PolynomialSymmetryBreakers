@@ -15,8 +15,8 @@ for lpfile in "$LP_DIR"/*.lp; do        # Iterate over all .lp files in the dire
 
   echo "Solving $lpfile"
 
-  Table: Gurobi configurations used in our experiments
 
+#Table: Gurobi configurations used in our experiments
 #+-----------+----------+---------+--------------+------------+
 #| Parameter | Baseline | Default | Conservative | Aggressive |
 #+-----------+----------+---------+--------------+------------+
@@ -33,7 +33,7 @@ for lpfile in "$LP_DIR"/*.lp; do        # Iterate over all .lp files in the dire
 #   Presolve=0 (disabled),
 #   Symmetry=0,
 #   WorkLimit=1800
-#   NonConvex=2: # Write solution to solfile, then append it to outfile (so outfile contains log + solution)
+#   Write solution to solfile, then append it to outfile (so outfile contains log + solution)
   gurobi_cl \
     LogFile="$outfile" \
     ResultFile="$solfile" \
