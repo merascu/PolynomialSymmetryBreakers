@@ -11,13 +11,14 @@
 
 Symmetry in integer programming causes redundant search and is often handled with symmetry breaking constraints that remove as many equivalent solutions as possible. We propose an algebraic method which allows to generate a random family of polynomial inequalities which can be used as symmetry breakers. The method requires as input an arbitrary base polynomial and a group of permutations which is pecific to the integer program. The computations can be easily carried out in any major symbolic computation software. The method was tested on a case study on near half-capacity 0-1 bin packing instances which exhibit substantial symmetries. We statically generate random quadratic breakers and add them to a baseline integer programming problem which we then solve with Gurobi.
 
-We performed an experimental evaluation of this method with several mathematical programming solvers ([Gurobi]([https://www.gurobi.com/]), [CPLEX]([[https://www.gurobi.com/](https://www.ibm.com/products/ilog-cplex-optimization-studio)]), [SCIP]([[https://www.gurobi.com/](https://www.scipopt.org/)], [Hexaly]([[https://www.hexaly.com/)]) and satisfiability modulo theory solvers ([Z3]([[https://www.gurobi.com/](https://github.com/z3prover/z3)])).
-
 We performed an experimental evaluation of this method using several mathematical programming solvers ([Gurobi](https://www.gurobi.com/), [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio), [SCIP](https://www.scipopt.org/), and [Hexaly](https://www.hexaly.com/)) and satisfiability modulo theories (SMT) solvers ([Z3](https://github.com/z3prover/z3)).
 
 It turns out that the effectiveness of polynomial symmetry breaking is strongly solver-dependent. Compact quadratic breaker families can improve performance, whereas linearization, large breaker sets, or solver reformulations may offset these gains through increased model size or less favorable search behavior. These results suggest that automatically generated symmetry breakers should be evaluated in a solver-aware manner rather than treated as solver-independent additions to a model.
 
 This repository accompanies the experimental paper *When Algebraic Symmetry Breaking Meets Solvers: An Experimental Study* submitted at [LPAR 2026]([https://www.issac-conference.org/2026/](https://easychair.org/smart-program/LPAR-26/)). 
+
+This repository accompanies the experimental paper *When Algebraic Symmetry Breaking Meets Solvers: An Experimental Study* submitted at [LPAR 2026]([[https://www.issac-conference.org/2026/](https://easychair.org/smart-program/LPAR-26/)](https://easychair.org/smart-program/LPAR-26/)). 
+
 
 ## Installation
 
