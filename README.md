@@ -61,12 +61,18 @@ Please ensure you have these dependencies installed and configured correctly bef
       ```
    4. Call the complied program as:
       ```bash
-      ./breakers.native <LP-FILE>
+      ./breakers.native <FILES>
       ```
-      where `LP-FILE` is one of the randomly generated bin packing instances.
+      where `FILES` are randomly generated bin packing instances (in
+      either `LP` or `SMT` format). The output will be in `LP` format by
+      default, but this can be changed by using the `--smt2` command line
+      option. Moreover, the `--repetitions <INT>` option can be used to
+      control how many breaker files should be generated for each input
+      file.
    - **Warnings**
-       - Currently the number of bins is hardcoded as $n = 2000$. For smaller number of variables, generating breakers will lead to crashes.
-       - The program assumes that the object sizes are given as a comment at the start of the `LP-FILE`. Moreover, it assumes that the objects sizes are ordered ascendingly.
+       - The program assumes that the object sizes are given as a
+         comment at the start of the `LP` or `SMT` file. Moreover, it
+         assumes that the objects sizes are ordered ascendingly.
 
 4. **Augment LPs with Symmetry-Breaking Constraints**
    - Augments the bin packing base model (`base.lp`) with symmetry-breaking constraints and writes the resulting LP models to `prob_with_sbs/`.  Each file in `sbs/` contains a *family* of symmetry breakers that is inserted into the base model to produce a corresponding augmented LP file.
