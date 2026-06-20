@@ -129,7 +129,14 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```bash
      python gen_files_with_sbs.py base_lp_file="base.lp" sbs_dir="sbs/" gen_lp_files="prob_with_sbs/"
      ```
-   - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py)
+   - For problem with linear symmetry breakers,
+   - - Run:
+     ```bash
+     python gen_files_with_lin_sbs.py lp_input_dir pairs_dir output_dir
+     ```
+     where `lp_input_dir` is the directory with the base `lp` file, `pairs_dir` is the directory with the files obtained at the previous step which will be used to construct the new lp problems which will be saved in `output_dir`
+
+   - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py), [gen_files_with_lin_sbs.py](./src/gen_files_with_lin_sbs.py)
 
 7. **Batch Solve LPs/SMT2s with Gurobi/CPLEX/SCIP/Z3**
    - Solves with Gurobi/CPLEX/SCIP/Z3 every model saved in an `lp`/`smt2` file. Saves the results into `out_files` directory.
