@@ -19,7 +19,7 @@ This repository accompanies the experimental paper *When Algebraic Symmetry Brea
 
 ## LPAR Results
 
-Each directory, coresponding to a solver used in the experiments, in the archive [LPAR2026-eval](???) contains two subfolders:
+Each directory, coresponding to a solver used in the experiments, in the archive [LPAR2026-eval](https://drive.google.com/file/d/1gd1dYetik97MqHwIUlDquI-EnoURzFco/view?usp=sharing) contains two subfolders:
 1. `lp/SMT2` contains the LP/SMT2 files with the problem instances, together with the corresponding `.out` files containing the solutions.
 2. `csv` contains the CSV files with the time required to find a solution and, where applicable, additional statistics. These files correspond to the `.out` files mentioned above.
 
@@ -96,13 +96,13 @@ Please ensure you have these dependencies installed and configured correctly bef
          comment at the start of the `LP` or `SMT` file. Moreover, it
          assumes that the objects sizes are ordered ascendingly.
 
-4. **Augment LPs with Symmetry-Breaking Constraints**
+4. **Augment problems in LP/SMT2 format with Symmetry-Breaking Constraints**
    - Augments the bin packing base model (`base.lp`) with symmetry-breaking constraints and writes the resulting LP models to `prob_with_sbs/`.  Each file in `sbs/` contains a *family* of symmetry breakers that is inserted into the base model to produce a corresponding augmented LP file.
    - Run:
      ```bash
      python gen_files_with_sbs.py base_lp_file="base.lp" sbs_dir="sbs/" gen_lp_files="prob_with_sbs/"
      ```
-   - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py)
+   - Code: 🔗 [gen_files_with_sbs_LP.py](./src/gen_files_with_sbs_LP.py)
 
 5. **Batch Solve LPs with Gurobi**
    - Solves with Gurobi every model saved in an `lp` file. Saves the results into `lp_out_files` directory.
