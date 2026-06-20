@@ -53,7 +53,7 @@ Please ensure you have these dependencies installed and configured correctly bef
       - Generates **0–1 bin packing** MILP instances in **LP format**.
       - Run:
         ```bash
-        python bin_packing_problem_generator.py --B=100 --n=2000 --classes=5 --seed=2042
+        python bin_packing_problem_generator_LP.py --B=100 --n=2000 --classes=5 --seed=2042
         ```
       - Code: 🔗 [bin_packing_problem_generator_LP.py](./src/bin_packing_problem_generator_LP.py)
    - **SMT files**
