@@ -93,7 +93,7 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```bash
      python gen_files_with_sbs.py base_lp_file="base.lp" sbs_dir="sbs/" gen_lp_files="prob_with_sbs/"
      ```
-   - Code: 🔗 [gen_files_with_sbs_LP.py](./src/gen_files_with_sbs_LP.py)
+   - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py)
 
 5. **Batch Solve LPs/SMT2s with Gurobi/CPLEX/SCIP/Z3**
    - Solves with Gurobi/CPLEX/SCIP/Z3 every model saved in an `lp`/`smt2` file. Saves the results into `out_files` directory.
