@@ -32,6 +32,9 @@ This project relies on the following libraries and tools:
 
 - **Python (v3.9.6)**
 - **Gurobi (v13.0.0), Academic License**
+- **CPLEX (v22.1.1.0), Academic License**
+- **SCIP (v10.0.2), Academic License**
+- **Z3 (v4.15.3)**
 - **Emacs (v29.1 or better)**
 - **OCaml (v5.3.0 or better) and opam**
 
