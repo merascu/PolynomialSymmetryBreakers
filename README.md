@@ -87,7 +87,47 @@ Please ensure you have these dependencies installed and configured correctly bef
          comment at the start of the `LP` or `SMT` file. Moreover, it
          assumes that the objects sizes are ordered ascendingly.
 
-4. **Augment problems in LP/SMT2 format with Symmetry-Breaking Constraints**
+4. **Liniarize** the symmetry breakers (optional)
+   - If tests with linear symmtry breakers want to be performed, then the breakers must be liniarized. The liniarization method, based on [^1], is illustrated below.
+  - Example 1:
+    **Input:**
+    ```text
+    a: x1 * x2 + x3 <= 1
+    ```
+    **Output:**
+    ```text
+    sb01: z_x1_x2 + x3 <= 1
+    sb02: z_x1_x2 - x1 <= 0
+    sb03: z_x1_x2 - x2 <= 0
+    sb04: x1 + x2 - z_x1_x2 <= 1
+    ```
+  - Example 2:
+    **Input:**
+    ```text
+    a: x1^2 <= 1
+    ```
+    **Output:**
+    ```text
+    x1 <= 1
+    ```
+  - Run:
+    ```bash
+    python liniarization.py input_dir output_dir
+    ```
+    where `input_dir` is the directory containing the symmetry breakers generated in the previous step, and `output_dir` is the directory where the linearized symmetry breakers will be written.
+
+    For each input file, the script generates a pair of output files:
+
+    1. a file containing the linearized symmetry breakers;
+    2. a file containing the list of newly introduced variables.
+
+  - Code: 🔗 [liniarization.py](./src/liniarization.py)
+
+[^1]: Add the full reference here.
+````
+
+
+6. **Augment problems in LP/SMT2 format with Symmetry-Breaking Constraints**
    - Augments the bin packing base model (`base.lp`) with symmetry-breaking constraints and writes the resulting LP models to `prob_with_sbs/`.  Each file in `sbs/` contains a *family* of symmetry breakers that is inserted into the base model to produce a corresponding augmented LP file.
    - Run:
      ```bash
@@ -95,7 +135,7 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```
    - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py)
 
-5. **Batch Solve LPs/SMT2s with Gurobi/CPLEX/SCIP/Z3**
+7. **Batch Solve LPs/SMT2s with Gurobi/CPLEX/SCIP/Z3**
    - Solves with Gurobi/CPLEX/SCIP/Z3 every model saved in an `lp`/`smt2` file. Saves the results into `out_files` directory.
    - Run:
      ```bash
@@ -103,7 +143,7 @@ Please ensure you have these dependencies installed and configured correctly bef
      ```
    - Code: 🔗 [run_all_lp_with_Gurobi.sh](./scripts/run_all_lp_with_Gurobi.sh), [run_all_lp_with_CPLEX.sh](./scripts/run_all_lp_with_CPLEX.sh), [run_all_lp_with_SCIP.sh](./scripts/run_all_lp_with_SCIP.sh), [run_all_lp_with_Z3.sh](./scripts/run_all_lp_with_Z3.sh)
 
-6. **Extract Solver Metrics to CSV**
+8. **Extract Solver Metrics to CSV**
    - Parses one file at a time and extracts into a CSV file different metrics, depending on the solver:
    - Run (for Gurobi):
       ```bash
@@ -118,3 +158,5 @@ Please ensure you have these dependencies installed and configured correctly bef
 ## License
 
 This project is licensed under the [BSD 3-Clause License](LICENCE).
+
+[^1]: Egon Balas. Extension de l’Algorithme Additif `a la Programmation en Nombres Entiers et `a la Programmation Non Lin´eaire. Comptes Rendus Hebdomadaires des Sceances de l’Academie des Sciences, 258(21):5136, 1964.
