@@ -61,7 +61,7 @@ Please ensure you have these dependencies installed and configured correctly bef
    - Run:
       - Example:
         ```bash
-        python bin_packing_problem_generator-SMT2.py --B=100 --n=2000 --classes=5 --seed=2042
+        python bin_packing_problem_generator_SMT2.py --B=100 --n=2000 --classes=5 --seed=2042
         ```
       - Code: 🔗 [bin_packing_problem_generator_SMT2.py](./src/bin_packing_problem_generator_SMT2.py)
 2. **Generate Symmetry Breakers**
