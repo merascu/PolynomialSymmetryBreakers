@@ -88,7 +88,7 @@ Please ensure you have these dependencies installed and configured correctly bef
          assumes that the objects sizes are ordered ascendingly.
 
 4. **Liniarize** the symmetry breakers (optional)
-   - If tests with linear symmtry breakers want to be performed, then the breakers must be liniarized. The liniarization method, based on [^1], is illustrated below.
+   - If tests with linear symmtry breakers want to be performed, then the breakers must be liniarized. The liniarization method, based on [1], is illustrated below.
   - Example 1:
     **Input:**
     ```text
@@ -123,10 +123,6 @@ Please ensure you have these dependencies installed and configured correctly bef
 
   - Code: 🔗 [liniarization.py](./src/liniarization.py)
 
-[^1]: Add the full reference here.
-````
-
-
 6. **Augment problems in LP/SMT2 format with Symmetry-Breaking Constraints**
    - Augments the bin packing base model (`base.lp`) with symmetry-breaking constraints and writes the resulting LP models to `prob_with_sbs/`.  Each file in `sbs/` contains a *family* of symmetry breakers that is inserted into the base model to produce a corresponding augmented LP file.
    - Run:
@@ -151,12 +147,9 @@ Please ensure you have these dependencies installed and configured correctly bef
       ```
    - Code: 🔗 [extract_to_csv_Gurobi.py](./src/extract_to_csv_Gurobi.py), [extract_to_csv_CPLEX.py](./src/extract_to_csv_CPLEX.py), [extract_to_csv_SCIP.py](./src/extract_to_csv_SCIP.py), [extract_to_csv_Z3.py](./src/extract_to_csv_Z3.py)
 
-
-
-
-
 ## License
 
 This project is licensed under the [BSD 3-Clause License](LICENCE).
 
-[^1]: Egon Balas. Extension de l’Algorithme Additif `a la Programmation en Nombres Entiers et `a la Programmation Non Lin´eaire. Comptes Rendus Hebdomadaires des Sceances de l’Academie des Sciences, 258(21):5136, 1964.
+## References
+[1]: Egon Balas. Extension de l’Algorithme Additif `a la Programmation en Nombres Entiers et `a la Programmation Non Lin´eaire. Comptes Rendus Hebdomadaires des Sceances de l’Academie des Sciences, 258(21):5136, 1964.
