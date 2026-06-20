@@ -89,27 +89,27 @@ Please ensure you have these dependencies installed and configured correctly bef
 
 4. **Liniarize** the symmetry breakers (optional)
    - If tests with linear symmtry breakers want to be performed, then the breakers must be liniarized. The liniarization method, based on [1], is illustrated below.
-  - Example 1:
-    **Input:**
-    ```text
-    a: x1 * x2 + x3 <= 1
-    ```
-    **Output:**
-    ```text
-    sb01: z_x1_x2 + x3 <= 1
-    sb02: z_x1_x2 - x1 <= 0
-    sb03: z_x1_x2 - x2 <= 0
-    sb04: x1 + x2 - z_x1_x2 <= 1
-    ```
-  - Example 2:
-    **Input:**
-    ```text
-    a: x1^2 <= 1
-    ```
-    **Output:**
-    ```text
-    x1 <= 1
-    ```
+     - Example 1:
+       **Input:**
+       ```text
+       x1 * x2 + x3 <= 1
+       ```
+       **Output:**
+       ```text
+       z_x1_x2 + x3 <= 1
+       z_x1_x2 - x1 <= 0
+       z_x1_x2 - x2 <= 0
+       x1 + x2 - z_x1_x2 <= 1
+       ```
+     - Example 2:
+       **Input:**
+       ```text
+       x1^2 <= 1
+       ```
+       **Output:**
+       ```text
+       x1 <= 1
+       ```
   - Run:
     ```bash
     python liniarization.py input_dir output_dir
