@@ -48,22 +48,13 @@ Please ensure you have these dependencies installed and configured correctly bef
 
 ## Features and Usage
 
-1. **Bin Packing Instance Generation**
-   - **LP files**
-      - Generates **0–1 bin packing** MILP instances in **LP format**.
-      - Run:
-        ```bash
-        python bin_packing_problem_generator_LP.py --B=100 --n=2000 --classes=5 --seed=2042
-        ```
-      - Code: 🔗 [bin_packing_problem_generator_LP.py](./src/bin_packing_problem_generator_LP.py)
-   - **SMT files**
-      - Generates **0–1 bin packing** instances in **SMT2 format**.
-   - Run:
-      - Example:
-        ```bash
-        python bin_packing_problem_generator_SMT2.py --B=100 --n=2000 --classes=5 --seed=2042
-        ```
-      - Code: 🔗 [bin_packing_problem_generator_SMT2.py](./src/bin_packing_problem_generator_SMT2.py)
+1. **Bin Packing LP/SMT2 Instance Generation**
+   - Generates **0–1 bin packing** instances in **LP format**.
+   - Run (for LP):
+     ```bash
+     python bin_packing_problem_generator_LP.py --B=100 --n=2000 --classes=5 --seed=2042
+     ```
+      - Code: 🔗 [bin_packing_problem_generator_LP.py](./src/bin_packing_problem_generator_LP.py), [bin_packing_problem_generator_smt2.py](./src/bin_packing_problem_generator_smt2.py)
 2. **Generate Symmetry Breakers**
    - Takes an instance of the bin packing problem and generates a suite of random symmetry breakers (10 for each combination of shape, number of variables, and number of permutations).
    
@@ -96,35 +87,76 @@ Please ensure you have these dependencies installed and configured correctly bef
          comment at the start of the `LP` or `SMT` file. Moreover, it
          assumes that the objects sizes are ordered ascendingly.
 
-4. **Augment problems in LP/SMT2 format with Symmetry-Breaking Constraints**
+4. **Liniarize** the symmetry breakers (optional)
+   - If tests with linear symmtry breakers want to be performed, then the breakers must be liniarized. The liniarization method, based on [1], is illustrated below.
+     - Example 1:
+       **Input:**
+       ```text
+       x1 * x2 + x3 <= 1
+       ```
+       **Output:**
+       ```text
+       z_x1_x2 + x3 <= 1
+       z_x1_x2 - x1 <= 0
+       z_x1_x2 - x2 <= 0
+       x1 + x2 - z_x1_x2 <= 1
+       ```
+     - Example 2:
+       **Input:**
+       ```text
+       x1^2 <= 1
+       ```
+       **Output:**
+       ```text
+       x1 <= 1
+       ```
+  - Run:
+    ```bash
+    python liniarization.py input_dir output_dir
+    ```
+    where `input_dir` is the directory containing the symmetry breakers generated in the previous step, and `output_dir` is the directory where the linearized symmetry breakers will be written.
+
+    For each input file, the script generates a pair of output files:
+
+    1. a file containing the linearized symmetry breakers;
+    2. a file containing the list of newly introduced variables.
+
+  - Code: 🔗 [liniarization.py](./src/liniarization.py)
+
+6. **Augment problems in LP/SMT2 format with Symmetry-Breaking Constraints**
    - Augments the bin packing base model (`base.lp`) with symmetry-breaking constraints and writes the resulting LP models to `prob_with_sbs/`.  Each file in `sbs/` contains a *family* of symmetry breakers that is inserted into the base model to produce a corresponding augmented LP file.
    - Run:
      ```bash
      python gen_files_with_sbs.py base_lp_file="base.lp" sbs_dir="sbs/" gen_lp_files="prob_with_sbs/"
      ```
-   - Code: 🔗 [gen_files_with_sbs_LP.py](./src/gen_files_with_sbs_LP.py)
+   - For problem with linear symmetry breakers,
+   - - Run:
+     ```bash
+     python gen_files_with_lin_sbs.py lp_input_dir pairs_dir output_dir
+     ```
+     where `lp_input_dir` is the directory with the base `lp` file, `pairs_dir` is the directory with the files obtained at the previous step which will be used to construct the new lp problems which will be saved in `output_dir`
 
-5. **Batch Solve LPs/SMT2s with Gurobi/CPLEX/SCIP/Z3**
-   - Solves with Gurobi/CPLEX/SCIP/Z3 every model saved in an `lp`/`smt2` file. Saves the results into `lp_out_files`/`smt2_out_files` directory.
-   - Parameters: `gurobi_cl` is run with the parameters `NonConvex=2`, `Presolve=0`, `Symmetry=0`, `WorkLimit=1800`.
+   - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py), [gen_files_with_lin_sbs.py](./src/gen_files_with_lin_sbs.py)
+
+7. **Batch Solve LPs/SMT2s with Gurobi/CPLEX/SCIP/Z3**
+   - Solves with Gurobi/CPLEX/SCIP/Z3 every model saved in an `lp`/`smt2` file. Saves the results into `out_files` directory.
    - Run:
      ```bash
-     ./run_all_lp_with_Gurobi.sh <lp_out_files>
+     ./run_all_lp_with_Gurobi.sh <out_files>
      ```
    - Code: 🔗 [run_all_lp_with_Gurobi.sh](./scripts/run_all_lp_with_Gurobi.sh), [run_all_lp_with_CPLEX.sh](./scripts/run_all_lp_with_CPLEX.sh), [run_all_lp_with_SCIP.sh](./scripts/run_all_lp_with_SCIP.sh), [run_all_lp_with_Z3.sh](./scripts/run_all_lp_with_Z3.sh)
 
-6. **Extract Solver Metrics to CSV**
+8. **Extract Solver Metrics to CSV**
    - Parses one file at a time and extracts into a CSV file different metrics, depending on the solver:
-   - Run:
+   - Run (for Gurobi):
       ```bash
-      python extract_to_csv.py in_path="path/to/dir_with_out_files" out_csv="results.csv"
+      python extract_to_csv_Gurobi.py in_path="path/to/dir_with_out_files" out_csv="results.csv"
       ```
    - Code: 🔗 [extract_to_csv_Gurobi.py](./src/extract_to_csv_Gurobi.py), [extract_to_csv_CPLEX.py](./src/extract_to_csv_CPLEX.py), [extract_to_csv_SCIP.py](./src/extract_to_csv_SCIP.py), [extract_to_csv_Z3.py](./src/extract_to_csv_Z3.py)
-
-
-
-
 
 ## License
 
 This project is licensed under the [BSD 3-Clause License](LICENCE).
+
+## References
+[1]: Egon Balas. Extension de l’Algorithme Additif `a la Programmation en Nombres Entiers et `a la Programmation Non Lin´eaire. Comptes Rendus Hebdomadaires des Sceances de l’Academie des Sciences, 258(21):5136, 1964.
