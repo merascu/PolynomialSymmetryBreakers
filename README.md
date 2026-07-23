@@ -49,12 +49,12 @@ Please ensure you have these dependencies installed and configured correctly bef
 ## Features and Usage
 
 1. **Bin Packing LP/SMT2 Instance Generation**
-   - Generates **0–1 bin packing** instances in **LP format**.
+   - Generates **0–1 bin packing** instances with item sizes around half-capacity of the bin in **LP** or **SMT2 format**.
    - Run (for LP):
      ```bash
-     python bin_packing_problem_generator_LP.py --B=100 --n=2000 --classes=5 --seed=2042
+     python bin-packing-problem-generator.py --B=100 --n=2000 --classes=5 --seed=2042 --outtype=lp
      ```
-      - Code: 🔗 [bin_packing_problem_generator_LP.py](./src/bin_packing_problem_generator_LP.py), [bin_packing_problem_generator_smt2.py](./src/bin_packing_problem_generator_smt2.py)
+      - Code: 🔗 [bin_packing_problem_generator.py](./src/bin_packing_problem_generator.py)
 2. **Generate Symmetry Breakers**
    - Takes an instance of the bin packing problem and generates a suite of random symmetry breakers (10 for each combination of shape, number of variables, and number of permutations).
    
