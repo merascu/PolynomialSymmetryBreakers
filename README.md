@@ -50,9 +50,9 @@ Please ensure you have these dependencies installed and configured correctly bef
 
 1. **Bin Packing LP/SMT2 Instance Generation**
    - Generates **0–1 bin packing** instances with item sizes around half-capacity of the bin in **LP** or **SMT2 format**.
-   - Run (for LP):
+   - Run:
      ```bash
-     python bin-packing-problem-generator.py --B=100 --n=2000 --classes=5 --seed=2042 --outtype=lp
+     python bin-packing-problem-generator.py --B=100 --n=2000 --classes=5 --seed=2042 --outtype="lp|smt2
      ```
       - Code: 🔗 [bin_packing_problem_generator.py](./src/bin_packing_problem_generator.py)
 2. **Generate Symmetry Breakers**
@@ -112,11 +112,11 @@ Please ensure you have these dependencies installed and configured correctly bef
        ```
   - Run:
     ```bash
-    python liniarization.py input_dir output_dir
+    python liniarization_smt_assume.py --input_dir="input_dir" --output_dir="output_dir" --out_type="lp|smt2"
     ```
     where `input_dir` is the directory containing the symmetry breakers generated in the previous step, and `output_dir` is the directory where the linearized symmetry breakers will be written.
 
-    For each input file, the script generates a pair of output files:
+    For each input file from `input_dir`, the script generates a pair of output files:
 
     1. a file containing the linearized symmetry breakers;
     2. a file containing the list of newly introduced variables.
