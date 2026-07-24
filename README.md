@@ -124,19 +124,18 @@ Please ensure you have these dependencies installed and configured correctly bef
   - Code: 🔗 [liniarization.py](./src/liniarization.py)
 
 6. **Augment problems in LP/SMT2 format with Symmetry-Breaking Constraints**
-   - Augments the bin packing base model (`base.lp`) with symmetry-breaking constraints and writes the resulting LP models to `prob_with_sbs/`.  Each file in `sbs/` contains a *family* of symmetry breakers that is inserted into the base model to produce a corresponding augmented LP file.
+   - Augments the bin packing base model (`base.lp` or `base.smt2`) with symmetry-breaking constraints from `sbs_dir/` and writes the resulting models to `prob_with_sbs/`.  Each file in `sbs_dir/` contains a *family* of symmetry breakers that is inserted into the base model to produce a corresponding augmented file.
    - Run:
      ```bash
-     python gen_files_with_sbs.py base_lp_file="base.lp" sbs_dir="sbs/" gen_lp_files="prob_with_sbs/"
+     python gen_files_with_sbs.py \
+        --base_file="base.(lp|smt2)" \
+        --sbs_dir="sbs_dir/" \
+        --prob_with_sbs="prob_with_sbs/" \
+        --sbs_type="linear|quadratic" \
+        --base_file_type="lp|smt2|omt"
      ```
-   - For problem with linear symmetry breakers,
-   - - Run:
-     ```bash
-     python gen_files_with_lin_sbs.py lp_input_dir pairs_dir output_dir
-     ```
-     where `lp_input_dir` is the directory with the base `lp` file, `pairs_dir` is the directory with the files obtained at the previous step which will be used to construct the new lp problems which will be saved in `output_dir`
-
-   - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py), [gen_files_with_lin_sbs.py](./src/gen_files_with_lin_sbs.py)
+Note that SMT2/OMT solvers have support only for linear constraints so the combination `quadratic` and `smt2|omt` will raise an error. Due to scalability reasons of SMT/OMT solvers, we allow both optimization and satisfiabily for these ones.
+   - Code: 🔗 [gen_files_with_sbs.py](./src/gen_files_with_sbs.py).
 
 7. **Batch Solve LPs/SMT2s with Gurobi/CPLEX/SCIP/Z3**
    - Solves with Gurobi/CPLEX/SCIP/Z3 every model saved in an `lp`/`smt2` file. Saves the results into `out_files` directory.
