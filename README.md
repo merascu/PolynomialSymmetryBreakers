@@ -52,7 +52,12 @@ Please ensure you have these dependencies installed and configured correctly bef
    - Generates **0–1 bin packing** instances with item sizes around half-capacity of the bin in **LP** or **SMT2 format**.
    - Run:
      ```bash
-     python bin-packing-problem-generator.py --B=100 --n=2000 --classes=5 --seed=2042 --outtype="lp|smt2
+     python bin-packing-problem-generator.py \
+        --B=100 \
+        --n=2000 \
+        --classes=5 \
+        --seed=2042 \
+        --outtype="lp|smt2
      ```
       - Code: 🔗 [bin_packing_problem_generator.py](./src/bin_packing_problem_generator.py)
 2. **Generate Symmetry Breakers**
@@ -112,7 +117,10 @@ Please ensure you have these dependencies installed and configured correctly bef
        ```
   - Run:
     ```bash
-    python liniarization_smt_assume.py --input_dir="input_dir" --output_dir="output_dir" --out_type="lp|smt2"
+    python liniarization_smt_assume.py \
+       --input_dir="input_dir" \
+       --output_dir="output_dir" \
+       --out_type="lp|smt2"
     ```
     where `input_dir` is the directory containing the symmetry breakers generated in the previous step, and `output_dir` is the directory where the linearized symmetry breakers will be written.
 
@@ -149,7 +157,10 @@ Note that SMT2/OMT solvers have support only for linear constraints so the combi
    - Parses one file at a time and extracts into a CSV file different metrics, depending on the solver:
    - Run:
       ```bash
-      python extract_to_csv.py in_path="path/to/out_or_dir" out_csv="results.csv" solver="(cplex|gurobi|scip|smt2)"
+      python extract_to_csv.py \
+         --in_path="path/to/out_or_dir" \
+         --out_csv="results.csv" \
+         --solver="(cplex|gurobi|scip|smt2)"
       ```
    - Code: 🔗 [extract_to_csv.py](./src/extract_to_csv.py)
 
