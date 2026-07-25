@@ -287,8 +287,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="solver format: cplex, gurobi, scip, or smt2",
     )
-    return parser.parse_args(key_value_arguments(sys.argv[1:]))
-
+    return parser.parse_args()
 
 def collect_out_files(in_path: Path) -> list[Path]:
     if in_path.is_file():
